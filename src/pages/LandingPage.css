@@ -1,0 +1,266 @@
+.landing-page {
+  min-height: 100vh;
+  overflow: hidden;
+  background: var(--page-bg);
+  border-bottom: 2px solid var(--page-border);
+}
+
+.landing-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: min(100% - 48px, 1260px);
+  height: 92px;
+  margin: 0 auto;
+}
+
+.brand {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  color: #58cc02;
+  font-size: 35px;
+  font-weight: 900;
+  letter-spacing: -2px;
+  line-height: 1;
+}
+
+.brand__icon {
+  width: 47px;
+  height: 47px;
+  fill: currentColor;
+  transform: rotate(-4deg);
+}
+
+.brand__eye {
+  fill: var(--page-bg);
+}
+
+.brand__beak {
+  fill: #ffb100;
+}
+
+.language-picker {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 3px;
+  color: var(--muted-color);
+  background: transparent;
+  border: 0;
+  border-radius: 10px;
+  font-size: 15px;
+  font-weight: 900;
+  letter-spacing: 1px;
+  cursor: pointer;
+}
+
+.language-picker svg {
+  width: 22px;
+  height: 22px;
+  fill: none;
+  stroke: currentColor;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: 2.5;
+}
+
+.language-picker:hover {
+  color: var(--muted-hover-color);
+}
+
+.language-picker:focus-visible,
+.action-button:focus-visible {
+  outline: 3px solid #84d8ff;
+  outline-offset: 4px;
+}
+
+.hero-section {
+  display: grid;
+  grid-template-columns: 510px 500px;
+  align-items: center;
+  justify-content: center;
+  gap: 100px;
+  min-height: calc(100vh - 94px);
+  padding: 30px 48px 110px;
+}
+
+.hero-art-wrap {
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: 100%;
+}
+
+.hero-art {
+  display: block;
+  width: 100%;
+  max-width: 500px;
+  height: auto;
+  filter: drop-shadow(0 18px 24px rgb(0 0 0 / 18%));
+}
+
+.hero-content {
+  width: 100%;
+  padding-top: 5px;
+  text-align: center;
+}
+
+.hero-content h1 {
+  margin: 0;
+  color: var(--heading-color);
+  font-size: clamp(30px, 2.25vw, 39px);
+  font-weight: 900;
+  letter-spacing: -1.1px;
+  line-height: 1.4;
+}
+
+.hero-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  width: 414px;
+  max-width: 100%;
+  margin: 56px auto 0;
+}
+
+.action-button {
+  display: grid;
+  place-items: center;
+  width: 100%;
+  min-height: 61px;
+  padding: 0 22px;
+  border-radius: 14px;
+  text-decoration: none;
+  font-size: 16px;
+  font-weight: 900;
+  letter-spacing: 0.7px;
+  cursor: pointer;
+  transition: filter 120ms ease, transform 120ms ease, box-shadow 120ms ease;
+}
+
+.action-button:hover {
+  filter: brightness(1.08);
+}
+
+.action-button:active {
+  transform: translateY(3px);
+  box-shadow: none;
+}
+
+.action-button--primary {
+  color: #fff;
+  background: #58cc02;
+  border: 0;
+  box-shadow: 0 6px 0 #459f00;
+}
+
+.action-button--secondary {
+  color: #1cb0f6;
+  background: transparent;
+  border: 2px solid var(--secondary-border);
+  box-shadow: 0 3px 0 var(--secondary-shadow);
+}
+
+@media (max-width: 1100px) {
+  .hero-section {
+    grid-template-columns: minmax(330px, 460px) minmax(400px, 500px);
+    gap: 44px;
+  }
+}
+
+@media (max-width: 850px) {
+  .landing-page {
+    overflow: visible;
+  }
+
+  .landing-header {
+    height: 78px;
+  }
+
+  .brand {
+    font-size: 29px;
+  }
+
+  .brand__icon {
+    width: 40px;
+    height: 40px;
+  }
+
+  .language-picker span {
+    display: none;
+  }
+
+  .language-picker::before {
+    content: "TIẾNG VIỆT";
+  }
+
+  .hero-section {
+    grid-template-columns: minmax(0, 560px);
+    gap: 34px;
+    min-height: calc(100vh - 80px);
+    padding: 34px 24px 76px;
+  }
+
+  .hero-art {
+    width: min(78vw, 410px);
+  }
+
+  .hero-content h1 {
+    font-size: clamp(27px, 5.6vw, 36px);
+  }
+
+  .hero-actions {
+    margin-top: 36px;
+  }
+}
+
+@media (max-width: 480px) {
+  .landing-header {
+    width: calc(100% - 32px);
+  }
+
+  .brand {
+    gap: 5px;
+    font-size: 25px;
+  }
+
+  .brand__icon {
+    width: 35px;
+    height: 35px;
+  }
+
+  .language-picker {
+    gap: 4px;
+    font-size: 12px;
+    letter-spacing: 0.6px;
+  }
+
+  .language-picker svg {
+    width: 18px;
+  }
+
+  .hero-section {
+    gap: 28px;
+    padding: 20px 20px 56px;
+  }
+
+  .hero-content h1 {
+    font-size: 25px;
+    line-height: 1.35;
+  }
+
+  .hero-content h1 br {
+    display: none;
+  }
+
+  .hero-actions {
+    gap: 15px;
+    margin-top: 30px;
+  }
+
+  .action-button {
+    min-height: 55px;
+    font-size: 14px;
+  }
+}
