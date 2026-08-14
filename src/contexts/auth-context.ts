@@ -10,7 +10,7 @@ export interface AuthState {
   accessToken: string | null
   isAuthenticated: boolean
   isInitializing: boolean
-  login(input: LoginRequest): Promise<void>
+  login(input: LoginRequest): Promise<AuthUser>
   updateCachedUser(patch: AuthUserCachePatch): void
   logout(): void
 }

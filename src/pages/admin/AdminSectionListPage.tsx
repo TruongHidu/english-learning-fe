@@ -127,7 +127,7 @@ export default function AdminSectionListPage() {
 
   return (
     <>
-      <main className="section-main w-full max-w-5xl">
+      <div className="w-full max-w-5xl">
         {/* Breadcrumb */}
         <div className="flex items-center gap-2 text-xs font-black text-slate-500 uppercase tracking-wider mb-3">
           <Link to="/admin/courses" className="hover:text-emerald-600 transition-colors">
@@ -314,7 +314,7 @@ export default function AdminSectionListPage() {
             ))}
           </div>
         )}
-      </main>
+      </div>
 
       <SectionFormModal
         isOpen={isFormModalOpen}

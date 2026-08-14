@@ -14,11 +14,20 @@ interface LoginFormProps {
   returnTo?: string
 }
 
-function getSafeReturnPath(returnTo?: string): string {
+function getSafeReturnPath(returnTo: string | undefined, role: 'USER' | 'ADMIN'): string {
+  const defaultPath = role === 'ADMIN' ? '/admin' : '/learn'
   if (!returnTo || !returnTo.startsWith('/') || returnTo.startsWith('//')) {
+    return defaultPath
+  }
+  if (returnTo === '/login' || returnTo === '/register' || returnTo === '/403') {
+    return defaultPath
+  }
+  if (role !== 'ADMIN' && returnTo.startsWith('/admin')) {
     return '/learn'
   }
-  if (returnTo === '/login' || returnTo === '/register') return '/learn'
+  if (role === 'ADMIN' && !returnTo.startsWith('/admin')) {
+    return '/admin'
+  }
   return returnTo
 }
 
@@ -47,8 +56,8 @@ export default function LoginForm({ initialEmail = '', returnTo }: LoginFormProp
     setFormError('')
 
     try {
-      await login(values)
-      navigate(getSafeReturnPath(returnTo), {
+      const loggedUser = await login(values)
+      navigate(getSafeReturnPath(returnTo, loggedUser.role), {
         replace: true,
         state: { flashMessage: 'Đăng nhập thành công.' },
       })

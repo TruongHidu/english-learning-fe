@@ -50,7 +50,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
     }
   }, [restoreSession])
 
-  const login = useCallback(async (input: LoginRequest) => {
+  const login = useCallback(async (input: LoginRequest): Promise<AuthUser> => {
     const response = await authService.login(input)
     const session: AuthSession = {
       accessToken: response.data.accessToken,
@@ -60,6 +60,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
     authStorage.saveSession(session)
     setAccessToken(session.accessToken)
     setUser(session.user)
+    return session.user
   }, [])
 
   const logout = useCallback(() => {

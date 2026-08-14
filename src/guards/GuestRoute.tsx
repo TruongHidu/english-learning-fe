@@ -4,10 +4,12 @@ import { useAuth } from '../hooks/useAuth'
 import RouteLoading from './RouteLoading'
 
 export default function GuestRoute({ children }: { children: ReactNode }) {
-  const { isAuthenticated, isInitializing } = useAuth()
+  const { isAuthenticated, isInitializing, user } = useAuth()
 
   if (isInitializing) return <RouteLoading />
-  if (isAuthenticated) return <Navigate to="/learn" replace />
+  if (isAuthenticated) {
+    return <Navigate to={user?.role === 'ADMIN' ? '/admin' : '/learn'} replace />
+  }
 
   return children
 }

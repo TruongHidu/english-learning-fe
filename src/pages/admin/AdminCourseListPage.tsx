@@ -154,7 +154,7 @@ export default function AdminCourseListPage() {
 
   return (
     <>
-      <main className="section-main w-full max-w-5xl">
+      <div className="w-full max-w-5xl">
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6">
           <div>
             <span className="text-xs font-black uppercase tracking-widest text-emerald-600">
@@ -414,7 +414,7 @@ export default function AdminCourseListPage() {
             )}
           </div>
         )}
-      </main>
+      </div>
 
       <CourseFormModal
         isOpen={isFormModalOpen}

@@ -3,9 +3,12 @@ import AuthInvalidationRedirect from '../guards/AuthInvalidationRedirect'
 import GuestRoute from '../guards/GuestRoute'
 import ProtectedRoute from '../guards/ProtectedRoute'
 import PublicHomeRoute from '../guards/PublicHomeRoute'
+import { useAuth } from '../hooks/useAuth'
+import AdminLayout from '../layouts/AdminLayout'
 import LearningLayout from '../layouts/LearningLayout'
 import LandingPage from '../pages/LandingPage'
 import AdminCourseListPage from '../pages/admin/AdminCourseListPage'
+import AdminDashboardPage from '../pages/admin/AdminDashboardPage'
 import AdminSectionListPage from '../pages/admin/AdminSectionListPage'
 import AppSectionPage from '../pages/app/AppSectionPage'
 import AuthPage from '../pages/auth/AuthPage'
@@ -13,6 +16,11 @@ import ForbiddenPage from '../pages/errors/ForbiddenPage'
 import CourseSectionsPage from '../pages/learn/CourseSectionsPage'
 import LearnPage from '../pages/learn/LearnPage'
 import ProfilePage from '../pages/profile/ProfilePage'
+
+function DashboardRedirect() {
+  const { user } = useAuth()
+  return <Navigate to={user?.role === 'ADMIN' ? '/admin' : '/learn'} replace />
+}
 
 function AppRoutes() {
   return (
@@ -31,7 +39,15 @@ function AppRoutes() {
           path="/login"
           element={<GuestRoute><AuthPage mode="login" /></GuestRoute>}
         />
-        <Route element={<ProtectedRoute><LearningLayout /></ProtectedRoute>}>
+
+        {/* Protected User Routes */}
+        <Route
+          element={
+            <ProtectedRoute allowedRoles={['USER']}>
+              <LearningLayout />
+            </ProtectedRoute>
+          }
+        >
           <Route path="/learn" element={<LearnPage />} />
           <Route path="/learn/courses/:courseId" element={<CourseSectionsPage />} />
           <Route
@@ -51,10 +67,11 @@ function AppRoutes() {
         <Route
           element={
             <ProtectedRoute allowedRoles={['ADMIN']}>
-              <LearningLayout />
+              <AdminLayout />
             </ProtectedRoute>
           }
         >
+          <Route path="/admin" element={<AdminDashboardPage />} />
           <Route path="/admin/courses" element={<AdminCourseListPage />} />
           <Route
             path="/admin/courses/:courseId/sections"
@@ -62,7 +79,10 @@ function AppRoutes() {
           />
         </Route>
 
-        <Route path="/dashboard" element={<Navigate to="/learn" replace />} />
+        <Route
+          path="/dashboard"
+          element={<ProtectedRoute><DashboardRedirect /></ProtectedRoute>}
+        />
         <Route
           path="/403"
           element={<ProtectedRoute><ForbiddenPage /></ProtectedRoute>}

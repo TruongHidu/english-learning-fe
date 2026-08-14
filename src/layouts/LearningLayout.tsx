@@ -41,10 +41,6 @@ function GemIcon() {
 export default function LearningLayout() {
   const { logout, user } = useAuth()
 
-  const items = user?.role === 'ADMIN'
-    ? [...baseNavigationItems, { to: '/admin/courses', label: 'QUẢN TRỊ', icon: 'admin' as SidebarIconName }]
-    : baseNavigationItems
-
   return (
     <div className="learning-shell">
       <aside className="learning-sidebar">
@@ -53,7 +49,7 @@ export default function LearningLayout() {
         </NavLink>
 
         <nav className="sidebar-nav" aria-label="Điều hướng chính">
-          {items.map((item) => (
+          {baseNavigationItems.map((item) => (
             <NavLink
               key={item.to}
               className={({ isActive }) => `sidebar-link${isActive ? ' sidebar-link--active' : ''}`}
