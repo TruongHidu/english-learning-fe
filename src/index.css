@@ -1,1 +1,84 @@
 @import "tailwindcss";
+
+:root {
+  color-scheme: light;
+  --page-bg: #ffffff;
+  --page-border: #e5e5e5;
+  --heading-color: #4b4b4b;
+  --muted-color: #777777;
+  --muted-hover-color: #4b4b4b;
+  --secondary-border: #e5e5e5;
+  --secondary-shadow: #d0d0d0;
+  color: var(--heading-color);
+  background: var(--page-bg);
+  font-family: "Arial Rounded MT Bold", "Nunito", "Segoe UI", sans-serif;
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    color-scheme: dark;
+    --page-bg: #15191a;
+    --page-border: #343a3b;
+    --heading-color: #c6c1ba;
+    --muted-color: #a8a6a2;
+    --muted-hover-color: #d0ceca;
+    --secondary-border: #404546;
+    --secondary-shadow: #2c3031;
+  }
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#root {
+  min-width: 320px;
+  min-height: 100%;
+  margin: 0;
+}
+
+button {
+  font: inherit;
+}
+
+.route-loading,
+.status-page {
+  display: grid;
+  min-height: 100vh;
+  padding: 24px;
+  place-items: center;
+  color: var(--heading-color);
+  background: var(--page-bg);
+  text-align: center;
+}
+
+.route-loading {
+  align-content: center;
+  gap: 12px;
+  font-weight: 800;
+}
+
+.route-loading__spinner {
+  margin: 0 auto;
+  border-color: var(--secondary-border);
+  border-top-color: #1cb0f6;
+}
+
+.status-page strong {
+  color: #ff4b4b;
+  font-size: 64px;
+}
+
+.status-page h1 {
+  margin: 8px 0 28px;
+  font-size: 24px;
+}
+
+.status-page a {
+  color: #1cb0f6;
+  font-weight: 900;
+}

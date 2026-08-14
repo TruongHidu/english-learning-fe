@@ -1,11 +1,24 @@
 import api from '../api/axios'
+import type {
+  LoginRequest,
+  LoginResponse,
+  RegisterRequest,
+  RegisterResponse,
+} from '../types/auth.types'
+import { authStorage } from '../utils/auth-storage'
 
 export const authService = {
-  login: <TResponse, TCredentials>(credentials: TCredentials) =>
-    api.post<TResponse>('/auth/login', credentials),
+  async login(input: LoginRequest): Promise<LoginResponse> {
+    const response = await api.post<LoginResponse>('/auth/login', input)
+    return response.data
+  },
 
-  register: <TResponse, TPayload>(payload: TPayload) =>
-    api.post<TResponse>('/auth/register', payload),
+  async register(input: RegisterRequest): Promise<RegisterResponse> {
+    const response = await api.post<RegisterResponse>('/auth/register', input)
+    return response.data
+  },
 
-  logout: () => api.post('/auth/logout'),
+  logout(): void {
+    authStorage.clear()
+  },
 }
