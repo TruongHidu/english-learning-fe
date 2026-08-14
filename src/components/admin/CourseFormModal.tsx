@@ -1,0 +1,205 @@
+import { useEffect } from 'react'
+import { useForm } from 'react-hook-form'
+import { zodResolver } from '@hookform/resolvers/zod'
+import { courseFormSchema, type CourseFormValues } from '../../schemas/course.schema'
+import type { CourseResponse } from '../../types/course.types'
+
+interface CourseFormModalProps {
+  isOpen: boolean
+  course?: CourseResponse | null
+  isLoading?: boolean
+  onSubmit: (values: CourseFormValues) => Promise<void>
+  onClose: () => void
+}
+
+export default function CourseFormModal({
+  isOpen,
+  course,
+  isLoading = false,
+  onSubmit,
+  onClose,
+}: CourseFormModalProps) {
+  const isEdit = !!course
+
+  const {
+    register,
+    handleSubmit,
+    reset,
+    formState: { errors },
+  } = useForm<CourseFormValues>({
+    resolver: zodResolver(courseFormSchema),
+    defaultValues: {
+      name: '',
+      description: '',
+      level: 'A1',
+      thumbnailUrl: '',
+      orderIndex: 0,
+    },
+  })
+
+  useEffect(() => {
+    if (isOpen) {
+      if (course) {
+        reset({
+          name: course.name,
+          description: course.description ?? '',
+          level: course.level,
+          thumbnailUrl: course.thumbnailUrl ?? '',
+          orderIndex: course.orderIndex,
+        })
+      } else {
+        reset({
+          name: '',
+          description: '',
+          level: 'A1',
+          thumbnailUrl: '',
+          orderIndex: 0,
+        })
+      }
+    }
+  }, [isOpen, course, reset])
+
+  if (!isOpen) return null
+
+  const handleFormSubmit = async (values: CourseFormValues) => {
+    await onSubmit(values)
+  }
+
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs animate-in fade-in duration-150"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="course-form-title"
+    >
+      <div className="w-full max-w-lg bg-white rounded-2xl p-6 shadow-2xl border-2 border-slate-200 overflow-y-auto max-h-[90vh]">
+        <div className="flex items-center justify-between pb-4 mb-4 border-b border-slate-100">
+          <h3 id="course-form-title" className="text-xl font-extrabold text-slate-800">
+            {isEdit ? 'CHỈNH SỬA KHÓA HỌC' : 'TẠO KHÓA HỌC MỚI'}
+          </h3>
+          <button
+            type="button"
+            onClick={onClose}
+            className="text-slate-400 hover:text-slate-600 text-lg font-bold p-1 cursor-pointer"
+          >
+            ✕
+          </button>
+        </div>
+
+        <form onSubmit={handleSubmit(handleFormSubmit)} className="space-y-4">
+          <div>
+            <label className="block text-xs font-extrabold text-slate-700 uppercase tracking-wider mb-1.5">
+              Tên khóa học <span className="text-rose-500">*</span>
+            </label>
+            <input
+              type="text"
+              placeholder="VD: Tiếng Anh cơ bản A1"
+              {...register('name')}
+              className={`w-full px-3.5 py-2.5 rounded-xl border-2 bg-slate-50 text-sm text-slate-800 font-medium focus:bg-white focus:outline-none transition-colors ${
+                errors.name ? 'border-rose-400 focus:border-rose-500' : 'border-slate-200 focus:border-emerald-500'
+              }`}
+            />
+            {errors.name && (
+              <p className="text-rose-500 text-xs font-semibold mt-1">{errors.name.message}</p>
+            )}
+          </div>
+
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className="block text-xs font-extrabold text-slate-700 uppercase tracking-wider mb-1.5">
+                Trình độ (Level) <span className="text-rose-500">*</span>
+              </label>
+              <select
+                {...register('level')}
+                className="w-full px-3.5 py-2.5 rounded-xl border-2 border-slate-200 bg-slate-50 text-sm text-slate-800 font-medium focus:bg-white focus:border-emerald-500 focus:outline-none transition-colors"
+              >
+                <option value="A1">A1 - Mới bắt đầu</option>
+                <option value="A2">A2 - Sơ cấp</option>
+                <option value="B1">B1 - Trung cấp</option>
+                <option value="B2">B2 - Trung cao cấp</option>
+                <option value="C1">C1 - Cao cấp</option>
+                <option value="C2">C2 - Thành thạo</option>
+              </select>
+              {errors.level && (
+                <p className="text-rose-500 text-xs font-semibold mt-1">{errors.level.message}</p>
+              )}
+            </div>
+
+            <div>
+              <label className="block text-xs font-extrabold text-slate-700 uppercase tracking-wider mb-1.5">
+                Thứ tự sắp xếp <span className="text-rose-500">*</span>
+              </label>
+              <input
+                type="number"
+                min="0"
+                {...register('orderIndex', { valueAsNumber: true })}
+                className={`w-full px-3.5 py-2.5 rounded-xl border-2 bg-slate-50 text-sm text-slate-800 font-medium focus:bg-white focus:outline-none transition-colors ${
+                  errors.orderIndex ? 'border-rose-400 focus:border-rose-500' : 'border-slate-200 focus:border-emerald-500'
+                }`}
+              />
+              {errors.orderIndex && (
+                <p className="text-rose-500 text-xs font-semibold mt-1">{errors.orderIndex.message}</p>
+              )}
+            </div>
+          </div>
+
+          <div>
+            <label className="block text-xs font-extrabold text-slate-700 uppercase tracking-wider mb-1.5">
+              Đường dẫn ảnh đại diện (Thumbnail URL)
+            </label>
+            <input
+              type="url"
+              placeholder="https://example.com/thumbnail.png (tùy chọn)"
+              {...register('thumbnailUrl')}
+              className={`w-full px-3.5 py-2.5 rounded-xl border-2 bg-slate-50 text-sm text-slate-800 font-medium focus:bg-white focus:outline-none transition-colors ${
+                errors.thumbnailUrl ? 'border-rose-400 focus:border-rose-500' : 'border-slate-200 focus:border-emerald-500'
+              }`}
+            />
+            {errors.thumbnailUrl && (
+              <p className="text-rose-500 text-xs font-semibold mt-1">{errors.thumbnailUrl.message}</p>
+            )}
+          </div>
+
+          <div>
+            <label className="block text-xs font-extrabold text-slate-700 uppercase tracking-wider mb-1.5">
+              Mô tả khóa học
+            </label>
+            <textarea
+              rows={3}
+              placeholder="Mô tả tóm tắt mục tiêu và đối tượng của khóa học..."
+              {...register('description')}
+              className="w-full px-3.5 py-2.5 rounded-xl border-2 border-slate-200 bg-slate-50 text-sm text-slate-800 font-medium focus:bg-white focus:border-emerald-500 focus:outline-none transition-colors"
+            />
+            {errors.description && (
+              <p className="text-rose-500 text-xs font-semibold mt-1">{errors.description.message}</p>
+            )}
+          </div>
+
+          {!isEdit && (
+            <p className="text-xs text-slate-500 italic bg-amber-50 p-2.5 rounded-lg border border-amber-200">
+              💡 Khóa học mới sẽ được tạo ở trạng thái <strong>BẢN NHÁP (DRAFT)</strong>. Bạn có thể xuất bản sau khi hoàn thiện các phần học.
+            </p>
+          )}
+
+          <div className="flex items-center justify-end gap-3 pt-3 border-t border-slate-100">
+            <button
+              type="button"
+              onClick={onClose}
+              disabled={isLoading}
+              className="px-4 py-2.5 font-bold text-sm text-slate-600 hover:bg-slate-100 rounded-xl transition-colors border border-slate-200 cursor-pointer disabled:opacity-50"
+            >
+              HỦY
+            </button>
+            <button
+              type="submit"
+              disabled={isLoading}
+              className="px-5 py-2.5 font-extrabold text-sm text-white bg-emerald-500 hover:bg-emerald-600 rounded-xl shadow-[0_4px_0_#047857] active:translate-y-1 active:shadow-none transition-all cursor-pointer disabled:opacity-50"
+            >
+              {isLoading ? 'ĐANG LƯU...' : isEdit ? 'CẬP NHẬT' : 'TẠO KHÓA HỌC'}
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  )
+}
