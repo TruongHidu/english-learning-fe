@@ -12,7 +12,7 @@ interface NavigationItem {
   icon: SidebarIconName
 }
 
-const navigationItems: NavigationItem[] = [
+const baseNavigationItems: NavigationItem[] = [
   { to: '/learn', label: 'HỌC', icon: 'learn' },
   { to: '/pronunciation', label: 'PHÁT ÂM', icon: 'pronunciation' },
   { to: '/leaderboard', label: 'BẢNG XẾP HẠNG', icon: 'leaderboard' },
@@ -49,7 +49,7 @@ export default function LearningLayout() {
         </NavLink>
 
         <nav className="sidebar-nav" aria-label="Điều hướng chính">
-          {navigationItems.map((item) => (
+          {baseNavigationItems.map((item) => (
             <NavLink
               key={item.to}
               className={({ isActive }) => `sidebar-link${isActive ? ' sidebar-link--active' : ''}`}

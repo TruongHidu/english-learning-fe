@@ -5,6 +5,7 @@ export type SidebarIconName =
   | 'quests'
   | 'shop'
   | 'profile'
+  | 'admin'
   | 'more'
 
 interface SidebarIconProps {
@@ -68,6 +69,18 @@ export default function SidebarIcon({ name }: SidebarIconProps) {
         <circle className="icon-main" cx="16" cy="12" r="4" />
         <path className="icon-main" d="M9 25c1-5 4-7 7-7s6 2 7 7" />
         <circle className="icon-accent" cx="25" cy="7" r="4" />
+      </svg>
+    )
+  }
+
+  if (name === 'admin') {
+    return (
+      <svg viewBox="0 0 32 32" aria-hidden="true">
+        <path
+          className="icon-main"
+          d="M16 4a3 3 0 0 0-3 3v1a9 9 0 0 0-2 .8l-.7-.7a3 3 0 0 0-4.2 4.2l.7.7A9 9 0 0 0 6 15H5a3 3 0 0 0 0 6h1a9 9 0 0 0 .8 2l-.7.7a3 3 0 0 0 4.2 4.2l.7-.7a9 9 0 0 0 2 .8v1a3 3 0 0 0 6 0v-1a9 9 0 0 0 2-.8l.7.7a3 3 0 0 0 4.2-4.2l-.7-.7a9 9 0 0 0 .8-2h1a3 3 0 0 0 0-6h-1a9 9 0 0 0-.8-2l.7-.7a3 3 0 0 0-4.2-4.2l-.7.7A9 9 0 0 0 19 8V7a3 3 0 0 0-3-3Z"
+        />
+        <circle className="icon-detail" cx="16" cy="18" r="4" />
       </svg>
     )
   }
