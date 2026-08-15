@@ -10,6 +10,15 @@ import LandingPage from '../pages/LandingPage'
 import AdminCourseListPage from '../pages/admin/AdminCourseListPage'
 import AdminDashboardPage from '../pages/admin/AdminDashboardPage'
 import AdminSectionListPage from '../pages/admin/AdminSectionListPage'
+import AdminAIContentPage from '../pages/admin/AdminAIContentPage'
+import AdminDiamondPackagePage from '../pages/admin/AdminDiamondPackagePage'
+import AdminLessonDetailPage from '../pages/admin/AdminLessonDetailPage'
+import AdminPaymentListPage from '../pages/admin/AdminPaymentListPage'
+import AdminQuestionListPage from '../pages/admin/AdminQuestionListPage'
+import AdminRevenuePage from '../pages/admin/AdminRevenuePage'
+import AdminTopicDetailPage from '../pages/admin/AdminTopicDetailPage'
+import AdminUserDetailPage from '../pages/admin/AdminUserDetailPage'
+import AdminUserListPage from '../pages/admin/AdminUserListPage'
 import AppSectionPage from '../pages/app/AppSectionPage'
 import AuthPage from '../pages/auth/AuthPage'
 import ForbiddenPage from '../pages/errors/ForbiddenPage'
@@ -65,18 +74,32 @@ function AppRoutes() {
 
         {/* Protected Admin Routes */}
         <Route
+          path="/admin"
           element={
             <ProtectedRoute allowedRoles={['ADMIN']}>
               <AdminLayout />
             </ProtectedRoute>
           }
         >
-          <Route path="/admin" element={<AdminDashboardPage />} />
-          <Route path="/admin/courses" element={<AdminCourseListPage />} />
+          <Route index element={<AdminDashboardPage />} />
+          <Route path="courses" element={<AdminCourseListPage />} />
           <Route
-            path="/admin/courses/:courseId/sections"
+            path="courses/:courseId"
             element={<AdminSectionListPage />}
           />
+          <Route
+            path="courses/:courseId/sections"
+            element={<AdminSectionListPage />}
+          />
+          <Route path="topics/:topicId" element={<AdminTopicDetailPage />} />
+          <Route path="lessons/:lessonId" element={<AdminLessonDetailPage />} />
+          <Route path="questions" element={<AdminQuestionListPage />} />
+          <Route path="ai-content" element={<AdminAIContentPage />} />
+          <Route path="users" element={<AdminUserListPage />} />
+          <Route path="users/:userId" element={<AdminUserDetailPage />} />
+          <Route path="payments" element={<AdminPaymentListPage />} />
+          <Route path="payments/packages" element={<AdminDiamondPackagePage />} />
+          <Route path="revenue" element={<AdminRevenuePage />} />
         </Route>
 
         <Route

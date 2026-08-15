@@ -1,71 +1,59 @@
+import { useState } from 'react'
+import { Link, useLocation } from 'react-router-dom'
 import { useAuth } from '../../hooks/useAuth'
 
 interface AdminHeaderProps {
-  onToggleSidebar?: () => void
+  onToggleSidebar: () => void
 }
 
-function MenuIcon() {
-  return (
-    <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-      <line x1="3" y1="12" x2="21" y2="12" />
-      <line x1="3" y1="6" x2="21" y2="6" />
-      <line x1="3" y1="18" x2="21" y2="18" />
-    </svg>
-  )
-}
-
-function LogoutIcon() {
-  return (
-    <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-      <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
-      <polyline points="16 17 21 12 16 7" />
-      <line x1="21" y1="12" x2="9" y2="12" />
-    </svg>
-  )
-}
+const routeLabels: Array<{ test: (path: string) => boolean; title: string; parent?: string }> = [
+  { test: (path) => path === '/admin', title: 'Dashboard' },
+  { test: (path) => /^\/admin\/courses\/[^/]+/.test(path), title: 'Chi tiết khóa học', parent: 'Nội dung học' },
+  { test: (path) => path === '/admin/courses', title: 'Nội dung học' },
+  { test: (path) => path.startsWith('/admin/topics/'), title: 'Chi tiết chủ đề', parent: 'Nội dung học' },
+  { test: (path) => path.startsWith('/admin/lessons/'), title: 'Chi tiết màn học', parent: 'Nội dung học' },
+  { test: (path) => path === '/admin/questions', title: 'Ngân hàng câu hỏi' },
+  { test: (path) => path === '/admin/ai-content', title: 'AI tạo nội dung' },
+  { test: (path) => /^\/admin\/users\/[^/]+/.test(path), title: 'Chi tiết người dùng', parent: 'Người dùng' },
+  { test: (path) => path === '/admin/users', title: 'Người dùng' },
+  { test: (path) => path === '/admin/payments/packages', title: 'Gói kim cương', parent: 'Thanh toán' },
+  { test: (path) => path === '/admin/payments', title: 'Giao dịch', parent: 'Thanh toán' },
+  { test: (path) => path === '/admin/revenue', title: 'Doanh thu', parent: 'Thanh toán' },
+]
 
 export default function AdminHeader({ onToggleSidebar }: AdminHeaderProps) {
   const { logout, user } = useAuth()
+  const { pathname } = useLocation()
+  const [accountOpen, setAccountOpen] = useState(false)
+  const current: { title: string; parent?: string } =
+    routeLabels.find((route) => route.test(pathname)) ?? { title: 'Quản trị' }
+  const initials = user?.displayName?.trim().charAt(0).toUpperCase() || 'A'
 
   return (
     <header className="admin-header" aria-label="Thanh công cụ quản trị">
       <div className="admin-header__left">
-        {onToggleSidebar && (
-          <button
-            type="button"
-            className="admin-header__toggle-btn md:hidden"
-            onClick={onToggleSidebar}
-            aria-label="Mở menu điều hướng"
-          >
-            <MenuIcon />
-          </button>
-        )}
-        <div className="admin-header__title-group">
-          <span className="admin-header__badge">HỆ THỐNG QUẢN TRỊ</span>
-          <h2 className="admin-header__title">LingoFox Admin</h2>
+        <button type="button" className="admin-header__menu" onClick={onToggleSidebar} aria-label="Mở menu điều hướng">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M4 12h16M4 17h16" /></svg>
+        </button>
+        <div className="admin-breadcrumb" aria-label="Breadcrumb">
+          <Link to="/admin">Admin</Link>
+          {current.parent ? <><span>/</span><span>{current.parent}</span></> : null}
+          <span>/</span><strong>{current.title}</strong>
         </div>
       </div>
 
-      <div className="admin-header__right">
-        <div className="admin-header__user-profile">
-          <div className="admin-header__avatar">
-            {user?.displayName ? user.displayName.charAt(0).toUpperCase() : 'A'}
-          </div>
-          <div className="admin-header__meta hidden sm:flex">
-            <span className="admin-header__user-name">{user?.displayName || 'Admin'}</span>
-            <span className="admin-header__user-email">{user?.email}</span>
-          </div>
-        </div>
-
-        <button
-          type="button"
-          onClick={logout}
-          className="admin-header__logout-btn"
-          title="Đăng xuất khỏi hệ thống"
-        >
-          <LogoutIcon />
-          <span className="hidden sm:inline">Đăng xuất</span>
+      <div className="admin-header__account">
+        <button type="button" className="admin-account-button" onClick={() => setAccountOpen((open) => !open)} aria-expanded={accountOpen}>
+          {user?.avatarUrl ? <img src={user.avatarUrl} alt="" className="admin-avatar" /> : <span className="admin-avatar">{initials}</span>}
+          <span className="admin-account-button__copy"><strong>{user?.displayName || 'Admin'}</strong><small>{user?.email}</small></span>
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m7 10 5 5 5-5" /></svg>
         </button>
+        {accountOpen ? (
+          <div className="admin-account-menu">
+            <div><strong>{user?.displayName || 'Admin'}</strong><small>{user?.email}</small></div>
+            <button type="button" onClick={logout}>Đăng xuất</button>
+          </div>
+        ) : null}
       </div>
     </header>
   )
