@@ -1,25 +1,91 @@
-import { useState } from 'react'
-import { useParams } from 'react-router-dom'
+import { useCallback, useEffect, useState } from 'react'
+import { Link, useParams } from 'react-router-dom'
 import DataTable from '../../components/admin/DataTable'
-import MockNotice from '../../components/admin/MockNotice'
 import PageHeader from '../../components/admin/PageHeader'
 import StatusBadge from '../../components/admin/StatusBadge'
-import { mockQuestions, mockTopic, mockTopicVocabulary } from '../../mocks/admin.mock'
+import LoadingState from '../../components/admin/LoadingState'
+import ErrorState from '../../components/admin/ErrorState'
+import { adminTopicService } from '../../services/admin-topic.service'
+import { adminLessonService } from '../../services/admin-lesson.service'
+import type { TopicResponse } from '../../types/topic.types'
+import type { LessonResponse } from '../../types/lesson.types'
 
 type TopicTab = 'overview' | 'lessons' | 'words' | 'questions'
 
 export default function AdminTopicDetailPage() {
   const { topicId } = useParams<{ topicId: string }>()
   const [tab, setTab] = useState<TopicTab>('overview')
+  const [topic, setTopic] = useState<TopicResponse | null>(null)
+  const [lessons, setLessons] = useState<LessonResponse[]>([])
+  const [isLoading, setIsLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
+
+  const loadData = useCallback(async () => {
+    if (!topicId) return
+    setIsLoading(true)
+    setError(null)
+    try {
+      const [topicData, lessonsData] = await Promise.all([
+        adminTopicService.getTopicById(topicId),
+        adminLessonService.getLessonsByTopic(topicId)
+      ])
+      setTopic(topicData)
+      setLessons(lessonsData)
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : 'Không thể tải dữ liệu chủ đề.')
+    } finally {
+      setIsLoading(false)
+    }
+  }, [topicId])
+
+  useEffect(() => {
+    void loadData()
+  }, [loadData])
+
+  if (isLoading) {
+    return <div className="admin-page"><LoadingState label="Đang tải dữ liệu..." /></div>
+  }
+
+  if (error || !topic) {
+    return (
+      <div className="admin-page">
+        <ErrorState title="Lỗi tải dữ liệu" message={error || 'Không tìm thấy chủ đề.'} onRetry={() => void loadData()} />
+      </div>
+    )
+  }
+
   return (
     <div className="admin-page">
-      <PageHeader eyebrow="Nội dung học" title={mockTopic.name} description={`Topic ID: ${topicId ?? mockTopic.id}`} action={<StatusBadge status={mockTopic.status} size="md" />} />
-      <MockNotice />
+      <PageHeader eyebrow="Nội dung học" title={topic.name} description={`Topic ID: ${topic.id}`} action={<StatusBadge status={topic.status} size="md" />} />
       <div className="admin-tabs" role="tablist">{([['overview','Tổng quan'],['lessons','Màn học'],['words','Từ vựng'],['questions','Câu hỏi']] as const).map(([value,label]) => <button key={value} type="button" role="tab" aria-selected={tab === value} onClick={() => setTab(value)}>{label}</button>)}</div>
-      {tab === 'overview' ? <section className="admin-card"><dl className="admin-detail-list"><div><dt>Topic name</dt><dd>{mockTopic.name}</dd></div><div><dt>Thứ tự</dt><dd>#{mockTopic.order}</dd></div><div><dt>Mô tả</dt><dd>{mockTopic.description}</dd></div><div><dt>Trạng thái</dt><dd><StatusBadge status={mockTopic.status} /></dd></div></dl></section> : null}
-      {tab === 'lessons' ? <section className="admin-card"><div className="admin-card__header"><div><h2>Màn học</h2><p>Lesson backend chưa được triển khai.</p></div><button type="button" disabled className="admin-button admin-button--primary">+ Thêm màn học</button></div><DataTable headers={['Tên màn học','Thứ tự','Trạng thái','Thao tác']} minWidth={600}>{mockTopic.lessons.map((lesson,index) => <tr key={lesson}><td className="admin-table__primary">{lesson}</td><td>#{index + 1}</td><td><StatusBadge status="DRAFT" /></td><td><button type="button" className="admin-button admin-button--secondary admin-button--small" disabled>Chờ API</button></td></tr>)}</DataTable></section> : null}
-      {tab === 'words' ? <DataTable headers={['Từ','Nghĩa','Phiên âm','Độ khó','Trạng thái']}>{mockTopicVocabulary.map((item) => <tr key={item.word}><td className="admin-table__primary">{item.word}</td><td>{item.meaning}</td><td>{item.phonetic}</td><td>{item.difficulty}</td><td><StatusBadge status={item.status} /></td></tr>)}</DataTable> : null}
-      {tab === 'questions' ? <DataTable headers={['Câu hỏi','Loại','Độ khó','Trạng thái']}>{mockQuestions.slice(0,2).map((item) => <tr key={item.id}><td className="admin-table__primary">{item.question}</td><td>{item.type}</td><td>{item.difficulty}</td><td><StatusBadge status={item.status} /></td></tr>)}</DataTable> : null}
+      
+      {tab === 'overview' ? <section className="admin-card"><dl className="admin-detail-list"><div><dt>Topic name</dt><dd>{topic.name}</dd></div><div><dt>Thứ tự</dt><dd>#{topic.orderIndex}</dd></div><div><dt>Mô tả</dt><dd>{topic.description || 'Chưa có mô tả'}</dd></div><div><dt>Trạng thái</dt><dd><StatusBadge status={topic.status} /></dd></div></dl></section> : null}
+      
+      {tab === 'lessons' ? (
+        <section className="admin-card">
+          <div className="admin-card__header">
+            <div><h2>Màn học</h2><p>Quản lý các màn học (lessons) trong topic này.</p></div>
+            <button type="button" className="admin-button admin-button--primary">+ Thêm màn học</button>
+          </div>
+          {lessons.length === 0 ? (
+            <div style={{ padding: '2rem', textAlign: 'center', color: 'var(--text-secondary)' }}>Chưa có màn học nào.</div>
+          ) : (
+            <DataTable headers={['Tên màn học','Thứ tự','Loại','Trạng thái','Thao tác']} minWidth={600}>
+              {lessons.map((lesson) => (
+                <tr key={lesson.id}>
+                  <td className="admin-table__primary">{lesson.name}</td>
+                  <td>#{lesson.orderIndex}</td>
+                  <td>Bài học</td>
+                  <td><StatusBadge status={lesson.status} /></td>
+                  <td><Link className="admin-button admin-button--secondary admin-button--small" to={`/admin/lessons/${lesson.id}`}>Xem chi tiết</Link></td>
+                </tr>
+              ))}
+            </DataTable>
+          )}
+        </section>
+      ) : null}
+      {tab === 'words' ? <div style={{ padding: '2rem', textAlign: 'center', color: 'var(--text-secondary)' }}>Tính năng từ vựng đang được phát triển...</div> : null}
+      {tab === 'questions' ? <div style={{ padding: '2rem', textAlign: 'center', color: 'var(--text-secondary)' }}>Tính năng câu hỏi đang được phát triển...</div> : null}
     </div>
   )
 }
