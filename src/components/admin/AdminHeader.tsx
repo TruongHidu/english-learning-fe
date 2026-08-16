@@ -10,6 +10,8 @@ const routeLabels: Array<{ test: (path: string) => boolean; title: string; paren
   { test: (path) => path === '/admin', title: 'Dashboard' },
   { test: (path) => /^\/admin\/courses\/[^/]+/.test(path), title: 'Chi tiết khóa học', parent: 'Nội dung học' },
   { test: (path) => path === '/admin/courses', title: 'Nội dung học' },
+  { test: (path) => path.startsWith('/admin/sections/'), title: 'Danh sách Topic', parent: 'Nội dung học' },
+  { test: (path) => /^\/admin\/topics\/[^/]+\/lessons$/.test(path), title: 'Danh sách Lesson', parent: 'Nội dung học' },
   { test: (path) => path.startsWith('/admin/topics/'), title: 'Chi tiết chủ đề', parent: 'Nội dung học' },
   { test: (path) => path.startsWith('/admin/lessons/'), title: 'Chi tiết màn học', parent: 'Nội dung học' },
   { test: (path) => path === '/admin/questions', title: 'Ngân hàng câu hỏi' },

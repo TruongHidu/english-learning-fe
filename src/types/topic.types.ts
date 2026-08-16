@@ -1,4 +1,5 @@
 import type { ContentStatus } from './course.types'
+import type { ApiSuccess } from './api.types'
 
 export interface TopicResponse {
   id: string
@@ -7,22 +8,23 @@ export interface TopicResponse {
   description: string | null
   orderIndex: number
   status: ContentStatus
+  lessonCount?: number
   createdAt: string
   updatedAt: string
 }
 
-export interface GetAdminTopicResponse {
-  success: true
-  message: string
-  data: {
-    topic: TopicResponse
-  }
+export interface CreateTopicInput {
+  name: string
+  description?: string
+  orderIndex?: number
+  status?: ContentStatus
 }
 
-export interface GetAdminTopicsBySectionResponse {
-  success: true
-  message: string
-  data: {
-    topics: TopicResponse[]
-  }
+export interface UpdateTopicInput {
+  name?: string
+  description?: string
 }
+
+export type GetAdminTopicResponse = ApiSuccess<{ topic: TopicResponse }>
+export type GetAdminTopicsBySectionResponse = ApiSuccess<{ topics: TopicResponse[] }>
+export type EmptyTopicMutationResponse = ApiSuccess<null>
