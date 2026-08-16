@@ -4,6 +4,8 @@ interface StatusBadgeProps {
     | 'LOCKED'
     | 'BANNED'
     | 'DRAFT'
+    | 'APPROVED'
+    | 'REJECTED'
     | 'PUBLISHED'
     | 'INACTIVE'
     | 'PENDING'
@@ -24,6 +26,14 @@ const statusConfig: Record<AdminStatus, { label: string; className: string }> = 
     label: 'BẢN NHÁP',
     className: 'admin-status--warning',
   },
+  APPROVED: {
+    label: 'ĐÃ DUYỆT',
+    className: 'admin-status--success',
+  },
+  REJECTED: {
+    label: 'TỪ CHỐI',
+    className: 'admin-status--danger',
+  },
   INACTIVE: {
     label: 'NGỪNG SỬ DỤNG',
     className: 'admin-status--neutral',
@@ -36,6 +46,7 @@ const statusConfig: Record<AdminStatus, { label: string; className: string }> = 
   FAILED: { label: 'THẤT BẠI', className: 'admin-status--danger' },
   CANCELLED: { label: 'ĐÃ HỦY', className: 'admin-status--neutral' },
 }
+
 
 export default function StatusBadge({ status, size = 'sm' }: StatusBadgeProps) {
   const config = statusConfig[status]
