@@ -12,6 +12,7 @@ import StatusBadge from '../../components/admin/StatusBadge'
 import type { LessonFormValues } from '../../schemas/lesson.schema'
 import { adminLessonService } from '../../services/admin-lesson.service'
 import { adminQuestionService } from '../../services/admin-question.service'
+import { adminVocabularyService } from '../../services/admin-vocabulary.service'
 import type { ContentStatus } from '../../types/course.types'
 import type { LessonResponse } from '../../types/lesson.types'
 import type {
@@ -21,7 +22,7 @@ import type {
   QuestionListItemResponse,
   QuestionType,
 } from '../../types/question.types'
-import type { VocabularyDifficulty } from '../../types/vocabulary.types'
+import type { VocabularyDifficulty, VocabularyResponse } from '../../types/vocabulary.types'
 import {
   getAdminContentError,
   getDuplicateNameError,
@@ -76,6 +77,8 @@ export default function AdminLessonDetailPage() {
   const [questionToRemove, setQuestionToRemove] =
     useState<LessonQuestionResponse | null>(null)
 
+  const [topicVocabularies, setTopicVocabularies] = useState<VocabularyResponse[]>([])
+
   const loadData = useCallback(async () => {
     if (!lessonId) {
       setError('Thiếu mã Lesson.')
@@ -91,12 +94,25 @@ export default function AdminLessonDetailPage() {
       ])
       setLesson(lessonData)
       setLessonQuestions(questionsData)
+
+      if (lessonData.topicId) {
+        try {
+          const vocabRes = await adminVocabularyService.getVocabulariesByTopic(
+            lessonData.topicId,
+            { limit: 100 },
+          )
+          setTopicVocabularies(vocabRes.vocabularies)
+        } catch {
+          // Silent ignore if topic vocabularies load failed
+        }
+      }
     } catch (err: unknown) {
       setError(getAdminContentError(err, 'Không thể tải Lesson.'))
     } finally {
       setIsLoading(false)
     }
   }, [lessonId])
+
 
   useEffect(() => {
     void loadData()
@@ -555,6 +571,7 @@ export default function AdminLessonDetailPage() {
       {/* Modal Tạo Câu Hỏi Trực Tiếp Cho Lesson */}
       <QuestionFormModal
         isOpen={isCreateQuestionModalOpen}
+        topicVocabularies={topicVocabularies}
         isLoading={isSubmitting}
         serverError={createQuestionError}
         onSubmit={handleCreateQuestionSubmit}
@@ -565,6 +582,7 @@ export default function AdminLessonDetailPage() {
           }
         }}
       />
+
 
       {/* Modal Gán Câu Hỏi Nâng Cao với Search, Filter & Multi-Select */}
       {isAssignModalOpen ? (

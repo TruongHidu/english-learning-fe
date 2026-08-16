@@ -30,6 +30,10 @@ interface PendingLessonStatus {
   status: ContentStatus
 }
 
+import QuestionFormModal from '../../components/admin/QuestionFormModal'
+import { adminQuestionService } from '../../services/admin-question.service'
+import type { CreateQuestionInput } from '../../types/question.types'
+
 export default function AdminTopicDetailPage() {
   const { topicId } = useParams<{ topicId: string }>()
   const location = useLocation()
@@ -50,6 +54,10 @@ export default function AdminTopicDetailPage() {
   const [vocabServerError, setVocabServerError] = useState<string | null>(null)
   const [vocabToDelete, setVocabToDelete] = useState<VocabularyResponse | null>(null)
 
+  const [isQuestionFormOpen, setIsQuestionFormOpen] = useState(false)
+  const [selectedVocabForQuestion, setSelectedVocabForQuestion] = useState<VocabularyResponse | null>(null)
+  const [questionServerError, setQuestionServerError] = useState<string | null>(null)
+
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [serverNameError, setServerNameError] = useState<string | null>(null)
   const [pendingStatus, setPendingStatus] = useState<PendingLessonStatus | null>(null)
@@ -57,6 +65,28 @@ export default function AdminTopicDetailPage() {
   const [isMutating, setIsMutating] = useState(false)
   const [isReordering, setIsReordering] = useState(false)
   const [draggedId, setDraggedId] = useState<string | null>(null)
+
+  const openQuestionFormForVocab = (vocab: VocabularyResponse) => {
+    setSelectedVocabForQuestion(vocab)
+    setQuestionServerError(null)
+    setIsQuestionFormOpen(true)
+  }
+
+  const handleQuestionSubmit = async (values: CreateQuestionInput) => {
+    setIsSubmitting(true)
+    setQuestionServerError(null)
+    try {
+      await adminQuestionService.createQuestion(values)
+      showNotification('success', `Đã tạo câu hỏi cho từ vựng "${selectedVocabForQuestion?.word ?? ''}".`)
+      setIsQuestionFormOpen(false)
+      setSelectedVocabForQuestion(null)
+    } catch (err: unknown) {
+      setQuestionServerError(getAdminContentError(err, 'Không thể tạo câu hỏi.'))
+    } finally {
+      setIsSubmitting(false)
+    }
+  }
+
 
   const loadData = useCallback(async () => {
     if (!topicId) { setError('Thiếu mã Topic.'); setIsLoading(false); return }
@@ -364,11 +394,19 @@ export default function AdminTopicDetailPage() {
                     <span className="admin-actions">
                       <button
                         type="button"
+                        className="admin-button admin-button--primary admin-button--small"
+                        onClick={() => openQuestionFormForVocab(vocab)}
+                      >
+                        + Tạo câu hỏi
+                      </button>
+                      <button
+                        type="button"
                         className="admin-button admin-button--secondary admin-button--small"
                         onClick={() => openEditVocabulary(vocab)}
                       >
                         Sửa
                       </button>
+
                       <select
                         className="admin-select admin-select--small"
                         value={vocab.status}
@@ -404,7 +442,23 @@ export default function AdminTopicDetailPage() {
 
       <TopicFormModal isOpen={isTopicFormOpen} topic={topic} isLoading={isSubmitting} serverNameError={serverNameError} onSubmit={handleTopicSubmit} onClose={() => { if (!isSubmitting) { setIsTopicFormOpen(false); setServerNameError(null) } }} />
       <LessonFormModal isOpen={isLessonFormOpen} lesson={selectedLesson} nextOrderIndex={lessons.length ? Math.max(...lessons.map((lesson) => lesson.orderIndex)) + 1 : 0} isLoading={isSubmitting} serverNameError={serverNameError} onSubmit={handleLessonSubmit} onClose={() => { if (!isSubmitting) { setIsLessonFormOpen(false); setSelectedLesson(null); setServerNameError(null) } }} />
+      <QuestionFormModal
+        isOpen={isQuestionFormOpen}
+        vocabularyId={selectedVocabForQuestion?.id}
+        topicVocabularies={vocabularies}
+        isLoading={isSubmitting}
+        serverError={questionServerError}
+        onSubmit={handleQuestionSubmit}
+        onClose={() => {
+          if (!isSubmitting) {
+            setIsQuestionFormOpen(false)
+            setSelectedVocabForQuestion(null)
+            setQuestionServerError(null)
+          }
+        }}
+      />
       <VocabularyFormModal isOpen={isVocabFormOpen} vocabulary={selectedVocab} isLoading={isSubmitting} serverError={vocabServerError} onSubmit={handleVocabSubmit} onClose={() => { if (!isSubmitting) { setIsVocabFormOpen(false); setSelectedVocab(null); setVocabServerError(null) } }} />
+
       <ConfirmModal isOpen={Boolean(pendingStatus)} title={pendingStatus?.status === 'PUBLISHED' ? 'Xuất bản Lesson?' : 'Đổi trạng thái Lesson?'} message={`Chuyển “${pendingStatus?.lesson.name ?? ''}” sang ${pendingStatus?.status ?? ''}?`} confirmLabel="Xác nhận" confirmVariant={pendingStatus?.status === 'PUBLISHED' ? 'primary' : 'warning'} isLoading={isMutating} onConfirm={() => void handleStatusChange()} onClose={() => setPendingStatus(null)} />
       <ConfirmModal isOpen={Boolean(lessonToDelete)} title="Xóa Lesson" message={`Xóa vĩnh viễn “${lessonToDelete?.name ?? ''}”? Thao tác này không xóa Topic.`} confirmLabel="Xóa Lesson" confirmVariant="danger" isLoading={isMutating} onConfirm={() => void handleDelete()} onClose={() => setLessonToDelete(null)} />
       <ConfirmModal isOpen={Boolean(vocabToDelete)} title="Xóa từ vựng" message={`Xóa từ vựng “${vocabToDelete?.word ?? ''}”?`} confirmLabel="Xóa từ vựng" confirmVariant="danger" isLoading={isMutating} onConfirm={() => void handleVocabDelete()} onClose={() => setVocabToDelete(null)} />

@@ -306,6 +306,7 @@ export default function AdminQuestionListPage() {
         <DataTable
           headers={[
             'Câu hỏi',
+            'Từ vựng liên kết',
             'Loại',
             'Độ khó',
             'Trạng thái',
@@ -318,6 +319,23 @@ export default function AdminQuestionListPage() {
               <td className="admin-table__primary">
                 <strong>{q.content}</strong>
               </td>
+              <td>
+                {q.vocabularies && q.vocabularies.length > 0 ? (
+                  <div className="flex flex-wrap gap-1">
+                    {q.vocabularies.map((v) => (
+                      <span
+                        key={v.id}
+                        className="inline-flex items-center gap-1 text-[11px] font-extrabold px-2 py-0.5 bg-emerald-50 text-emerald-800 border border-emerald-200 rounded-lg"
+                      >
+                        🔤 {v.word}
+                      </span>
+                    ))}
+                  </div>
+                ) : (
+                  <span className="text-slate-400 text-xs font-semibold">— (Tổng hợp)</span>
+                )}
+              </td>
+
               <td>
                 <span className="text-xs font-semibold px-2 py-1 bg-slate-100 rounded">
                   {q.type}

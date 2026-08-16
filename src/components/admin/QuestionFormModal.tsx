@@ -4,12 +4,13 @@ import type {
   QuestionResponse,
   QuestionType,
 } from '../../types/question.types'
-import type { VocabularyDifficulty } from '../../types/vocabulary.types'
+import type { VocabularyDifficulty, VocabularyResponse } from '../../types/vocabulary.types'
 
 interface QuestionFormModalProps {
   isOpen: boolean
   question?: QuestionResponse | null
   vocabularyId?: string
+  topicVocabularies?: VocabularyResponse[]
   isLoading: boolean
   serverError?: string | null
   onSubmit: (values: CreateQuestionInput) => Promise<void>
@@ -20,6 +21,7 @@ export default function QuestionFormModal({
   isOpen,
   question,
   vocabularyId,
+  topicVocabularies = [],
   isLoading,
   serverError,
   onSubmit,
@@ -34,8 +36,8 @@ export default function QuestionFormModal({
   const [correctAnswerText, setCorrectAnswerText] = useState('')
   const [audioUrl, setAudioUrl] = useState('')
   const [imageUrl, setImageUrl] = useState('')
+  const [selectedVocabIds, setSelectedVocabIds] = useState<string[]>([])
 
-  // Dynamic Options for MULTIPLE_CHOICE & Word Bank (FILL_BLANK / ORDER_SENTENCE)
   const [options, setOptions] = useState<
     Array<{ content: string; imageUrl?: string; isCorrect: boolean }>
   >([
@@ -45,7 +47,6 @@ export default function QuestionFormModal({
     { content: '', isCorrect: false },
   ])
 
-  // Dynamic Matching pairs for MATCHING
   const [matchingPairs, setMatchingPairs] = useState<
     Array<{ leftValue: string; rightValue: string }>
   >([
@@ -67,6 +68,12 @@ export default function QuestionFormModal({
       setDifficulty(question.difficulty ?? 'EASY')
       setAudioUrl(question.audioUrl ?? '')
       setImageUrl(question.imageUrl ?? '')
+
+      const initialVIds = question.vocabularyIds && question.vocabularyIds.length > 0
+        ? question.vocabularyIds
+        : (question.vocabularyId ? [question.vocabularyId] : [])
+      setSelectedVocabIds(initialVIds)
+
       setCorrectAnswerText(
         typeof question.correctAnswer === 'string'
           ? question.correctAnswer
@@ -97,6 +104,7 @@ export default function QuestionFormModal({
       setDifficulty('EASY')
       setAudioUrl('')
       setImageUrl('')
+      setSelectedVocabIds(vocabularyId ? [vocabularyId] : [])
       setCorrectAnswerText('')
       setOptions([
         { content: '', isCorrect: true },
@@ -110,9 +118,15 @@ export default function QuestionFormModal({
         { leftValue: '', rightValue: '' },
       ])
     }
-  }, [isOpen, question])
+  }, [isOpen, question, vocabularyId])
 
   if (!isOpen) return null
+
+  const toggleVocabulary = (vId: string) => {
+    setSelectedVocabIds((prev) =>
+      prev.includes(vId) ? prev.filter((id) => id !== vId) : [...prev, vId],
+    )
+  }
 
   const addOption = () => {
     setOptions((prev) => [...prev, { content: '', isCorrect: false }])
@@ -158,7 +172,8 @@ export default function QuestionFormModal({
     }
 
     const payload: CreateQuestionInput = {
-      vocabularyId,
+      vocabularyId: selectedVocabIds.length > 0 ? selectedVocabIds[0] : undefined,
+      vocabularyIds: selectedVocabIds,
       type,
       content: content.trim(),
       instruction: instruction.trim() || undefined,
@@ -199,14 +214,12 @@ export default function QuestionFormModal({
         orderIndex: idx + 1,
       }))
     } else {
-      // FILL_BLANK, ORDER_SENTENCE, TRANSLATION, LISTENING
       if (!correctAnswerText.trim()) {
         setLocalError('Đáp án chính xác là bắt buộc cho loại câu hỏi này')
         return
       }
       payload.correctAnswer = correctAnswerText.trim()
 
-      // Gửi kèm options nhiễu nếu Admin nhập cho FILL_BLANK / ORDER_SENTENCE
       const validExtraOptions = options.filter((o) => o.content.trim().length > 0)
       if (validExtraOptions.length > 0) {
         payload.options = validExtraOptions.map((o, idx) => ({
@@ -248,6 +261,40 @@ export default function QuestionFormModal({
             </div>
           ) : null}
 
+          {/* Chọn Từ Vựng Liên Kết (Hỗ trợ 1 hoặc nhiều từ) */}
+          {topicVocabularies.length > 0 ? (
+            <div className="p-3.5 bg-emerald-50/70 border border-emerald-200 rounded-xl space-y-2">
+              <div className="flex items-center justify-between">
+                <label className="block text-xs font-extrabold text-emerald-900">
+                  🔤 Từ vựng liên kết ({selectedVocabIds.length} từ đã chọn)
+                </label>
+                <span className="text-[11px] font-semibold text-emerald-700">
+                  (Bấm vào thẻ để chọn/bỏ chọn từ vựng)
+                </span>
+              </div>
+              <div className="flex flex-wrap gap-2 pt-1">
+                {topicVocabularies.map((v) => {
+                  const isSelected = selectedVocabIds.includes(v.id)
+                  return (
+                    <button
+                      key={v.id}
+                      type="button"
+                      onClick={() => toggleVocabulary(v.id)}
+                      className={`px-3 py-1.5 rounded-xl border text-xs font-bold transition-all shadow-2xs ${
+                        isSelected
+                          ? 'bg-emerald-600 border-emerald-700 text-white shadow-xs scale-102'
+                          : 'bg-white border-slate-200 text-slate-700 hover:border-emerald-400'
+                      }`}
+                    >
+                      {isSelected ? '✓ ' : '+ '}
+                      {v.word} ({v.meaning})
+                    </button>
+                  )
+                })}
+              </div>
+            </div>
+          ) : null}
+
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
               <label className="block text-xs font-extrabold text-slate-700 mb-1.5">
@@ -285,7 +332,6 @@ export default function QuestionFormModal({
             </div>
           </div>
 
-          {/* Đề bài / Nội dung */}
           <div>
             <label className="block text-xs font-extrabold text-slate-700 mb-1.5">
               Nội dung câu hỏi / Đề bài *
@@ -305,11 +351,6 @@ export default function QuestionFormModal({
               value={content}
               onChange={(e) => setContent(e.target.value)}
             />
-            {type === 'FILL_BLANK' ? (
-              <p className="text-[11px] text-amber-700 font-semibold mt-1">
-                💡 Lưu ý: Hãy đặt chuỗi <code className="bg-amber-100 px-1 rounded">___</code> trong đề bài để đánh dấu chỗ trống cần điền.
-              </p>
-            ) : null}
           </div>
 
           <div>
@@ -318,21 +359,12 @@ export default function QuestionFormModal({
             </label>
             <input
               className="admin-field"
-              placeholder={
-                type === 'FILL_BLANK'
-                  ? 'VD: Chọn hoặc gõ từ thích hợp vào chỗ trống'
-                  : type === 'ORDER_SENTENCE'
-                    ? 'VD: Bấm chọn các từ theo đúng thứ tự câu'
-                    : type === 'MATCHING'
-                      ? 'VD: Nối từ Tiếng Anh với nghĩa Tiếng Việt tương ứng'
-                      : 'VD: Chọn 1 đáp án chính xác'
-              }
+              placeholder="VD: Chọn 1 đáp án chính xác"
               value={instruction}
               onChange={(e) => setInstruction(e.target.value)}
             />
           </div>
 
-          {/* Link âm thanh & hình ảnh minh họa */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
               <label className="block text-xs font-extrabold text-slate-700 mb-1.5">
@@ -358,7 +390,6 @@ export default function QuestionFormModal({
             </div>
           </div>
 
-          {/* 1. Trắc nghiệm (MULTIPLE_CHOICE) */}
           {type === 'MULTIPLE_CHOICE' ? (
             <div className="p-4 bg-slate-50 border border-slate-200 rounded-xl space-y-3">
               <div className="flex items-center justify-between">
@@ -414,7 +445,6 @@ export default function QuestionFormModal({
             </div>
           ) : null}
 
-          {/* 2. Ghép đôi (MATCHING) */}
           {type === 'MATCHING' ? (
             <div className="p-4 bg-slate-50 border border-slate-200 rounded-xl space-y-3">
               <div className="flex items-center justify-between">
@@ -473,7 +503,6 @@ export default function QuestionFormModal({
             </div>
           ) : null}
 
-          {/* 3. Các loại còn lại: FILL_BLANK, ORDER_SENTENCE, TRANSLATION, LISTENING */}
           {type !== 'MULTIPLE_CHOICE' && type !== 'MATCHING' ? (
             <div className="space-y-4">
               <div>
@@ -482,19 +511,12 @@ export default function QuestionFormModal({
                 </label>
                 <input
                   className="admin-field"
-                  placeholder={
-                    type === 'FILL_BLANK'
-                      ? 'VD: intelligent'
-                      : type === 'ORDER_SENTENCE'
-                        ? 'VD: I go to school by bicycle every day'
-                        : 'VD: She likes reading books'
-                  }
+                  placeholder="Nhập đáp án đúng..."
                   value={correctAnswerText}
                   onChange={(e) => setCorrectAnswerText(e.target.value)}
                 />
               </div>
 
-              {/* Ngân hàng từ lựa chọn (Word Bank) cho FILL_BLANK hoặc ORDER_SENTENCE */}
               {type === 'FILL_BLANK' || type === 'ORDER_SENTENCE' ? (
                 <div className="p-4 bg-slate-50 border border-slate-200 rounded-xl space-y-3">
                   <div className="flex items-center justify-between">
@@ -502,11 +524,6 @@ export default function QuestionFormModal({
                       <label className="block text-xs font-extrabold text-slate-700">
                         Các từ gợi ý / từ nhiễu bổ sung (Word Bank Chips)
                       </label>
-                      <p className="text-[11px] text-slate-500">
-                        {type === 'FILL_BLANK'
-                          ? 'Thêm các từ gợi ý nhiễu để học viên bấm chọn vào ô ___.'
-                          : 'Thêm các từ nhiễu ngoài các từ trong câu chính xác để xáo trộn.'}
-                      </p>
                     </div>
                     <button
                       type="button"
