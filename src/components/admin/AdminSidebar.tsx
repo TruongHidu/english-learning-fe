@@ -31,6 +31,7 @@ function AdminIcon({ name }: { name: IconName }) {
 export default function AdminSidebar({ isOpen, onClose }: AdminSidebarProps) {
   const { logout, user } = useAuth()
   const location = useLocation()
+  const learningRouteActive = ['/admin/courses', '/admin/sections/', '/admin/topics/', '/admin/lessons/'].some((prefix) => location.pathname.startsWith(prefix))
   const paymentRouteActive = location.pathname.startsWith('/admin/payments') || location.pathname.startsWith('/admin/revenue')
   const [paymentsOpen, setPaymentsOpen] = useState(paymentRouteActive)
 
@@ -67,7 +68,7 @@ export default function AdminSidebar({ isOpen, onClose }: AdminSidebarProps) {
 
         <div className="admin-nav-group">
           <span className="admin-nav-group__label">Quản lý học tập</span>
-          <NavLink to="/admin/courses" className={navLinkClass} onClick={onClose} title="Nội dung học">
+          <NavLink to="/admin/courses" className={() => `admin-sidebar__link${learningRouteActive ? ' admin-sidebar__link--active' : ''}`} onClick={onClose} title="Nội dung học">
             <span className="admin-sidebar__icon"><AdminIcon name="book" /></span>
             <span className="admin-sidebar__label">Nội dung học</span>
           </NavLink>

@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react'
-import { Link, useLocation, useParams } from 'react-router-dom'
+import { useLocation, useParams } from 'react-router-dom'
 import AdminSectionCard from '../../components/admin/AdminSectionCard'
 import ConfirmModal from '../../components/admin/ConfirmModal'
 import EmptyState from '../../components/admin/EmptyState'
@@ -123,7 +123,6 @@ export default function AdminSectionListPage() {
         <>
           <div className="admin-filter-bar"><span style={{ flex: 1, color: '#657187', fontSize: 12, fontWeight: 700 }}>Cấu trúc Section trong khóa học</span><select className="admin-select" value={statusFilter} onChange={(event) => setStatusFilter(event.target.value as ContentStatus | '')} aria-label="Lọc trạng thái Section"><option value="">Tất cả trạng thái</option><option value="DRAFT">Bản nháp</option><option value="PUBLISHED">Đã phát hành</option><option value="INACTIVE">Ngừng sử dụng</option></select><button type="button" className="admin-button admin-button--primary" onClick={openCreateSection}>+ Thêm Section</button></div>
           {sections.length === 0 ? <EmptyState title="Chưa có Section nào" description="Thêm Section đầu tiên để xây dựng cấu trúc nội dung khóa học." action={<button type="button" className="admin-button admin-button--primary" onClick={openCreateSection}>+ Thêm Section</button>} /> : <div style={{ display: 'grid', gap: 12 }}>{sections.map((section) => <AdminSectionCard key={section.id} section={section} onEdit={(value) => { setSelectedSection(value); setIsFormModalOpen(true) }} onToggleStatus={(value) => void handleToggleStatus(value)} onDeactivate={setSectionToDeactivate} />)}</div>}
-          <div className="admin-mock-notice"><strong>Topic TODO</strong><span>Topic, Lesson, Vocabulary và Question chưa có backend; nút thêm Topic được khóa có chủ đích. Có thể xem UI skeleton tại <Link to="/admin/topics/topic-demo">Topic demo</Link>.</span></div>
         </>
       )}
 

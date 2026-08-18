@@ -61,23 +61,3 @@ export const mockRevenueStats = [
   { label: 'Giao dịch thành công', value: '1.284', note: 'Tỷ lệ thành công 94,2%', tone: 'violet' as const },
   { label: 'Người dùng đã nạp', value: '846', note: '67,8% người dùng hoạt động', tone: 'amber' as const },
 ]
-
-export const mockTopic = {
-  id: 'topic-demo',
-  name: 'Daily Life',
-  description: 'Từ vựng và mẫu câu thường dùng trong sinh hoạt hằng ngày.',
-  status: 'DRAFT' as const,
-  order: 2,
-  lessons: ['Morning routine', 'At school', 'After work'],
-}
-
-export const mockTopicVocabulary = [
-  { word: 'routine', meaning: 'thói quen', phonetic: '/ruːˈtiːn/', difficulty: 'Dễ', status: 'DRAFT' as const },
-]
-
-export const mockLesson = {
-  name: 'Morning routine',
-  order: 1,
-  type: 'Vocabulary',
-  status: 'DRAFT' as const,
-}
