@@ -11,14 +11,19 @@ import SearchInput from '../../components/admin/SearchInput'
 import StatusBadge from '../../components/admin/StatusBadge'
 import { adminQuestionService } from '../../services/admin-question.service'
 import type {
-  CreateQuestionInput,
+  QuestionFormSubmission,
   QuestionListItemResponse,
+  QuestionMediaFieldErrors,
   QuestionResponse,
   QuestionStatus,
   QuestionType,
 } from '../../types/question.types'
 import type { VocabularyDifficulty } from '../../types/vocabulary.types'
 import { getAdminContentError } from '../../utils/admin-content-errors'
+import {
+  buildQuestionFormData,
+  getQuestionUploadErrors,
+} from '../../utils/question-media'
 
 export default function AdminQuestionListPage() {
   const [questions, setQuestions] = useState<QuestionListItemResponse[]>([])
@@ -50,6 +55,9 @@ export default function AdminQuestionListPage() {
   const [isPreviewOpen, setIsPreviewOpen] = useState(false)
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [serverError, setServerError] = useState<string | null>(null)
+  const [serverMediaErrors, setServerMediaErrors] =
+    useState<QuestionMediaFieldErrors>({})
+  const [uploadProgress, setUploadProgress] = useState<number | null>(null)
   const [questionToDelete, setQuestionToDelete] =
     useState<QuestionListItemResponse | null>(null)
   const [isMutating, setIsMutating] = useState(false)
@@ -99,6 +107,8 @@ export default function AdminQuestionListPage() {
   const openCreate = () => {
     setSelectedQuestion(null)
     setServerError(null)
+    setServerMediaErrors({})
+    setUploadProgress(null)
     setIsFormOpen(true)
   }
 
@@ -108,6 +118,8 @@ export default function AdminQuestionListPage() {
       const fullQuestion = await adminQuestionService.getQuestionById(item.id)
       setSelectedQuestion(fullQuestion)
       setServerError(null)
+      setServerMediaErrors({})
+      setUploadProgress(null)
       setIsFormOpen(true)
     } catch (err: unknown) {
       showNotification(
@@ -135,24 +147,40 @@ export default function AdminQuestionListPage() {
     }
   }
 
-  const handleSubmit = async (values: CreateQuestionInput) => {
+  const handleSubmit = async (values: QuestionFormSubmission) => {
     setIsSubmitting(true)
     setServerError(null)
+    setServerMediaErrors({})
+    setUploadProgress(0)
+    const formData = buildQuestionFormData(values)
     try {
       if (selectedQuestion) {
-        await adminQuestionService.updateQuestion(selectedQuestion.id, values)
+        await adminQuestionService.updateQuestion(
+          selectedQuestion.id,
+          formData,
+          setUploadProgress,
+        )
         showNotification('success', 'Đã cập nhật câu hỏi.')
       } else {
-        await adminQuestionService.createQuestion(values)
+        await adminQuestionService.createQuestion(formData, setUploadProgress)
         showNotification('success', 'Đã tạo câu hỏi mới.')
       }
       setIsFormOpen(false)
       setSelectedQuestion(null)
       void fetchQuestions()
     } catch (err: unknown) {
-      setServerError(getAdminContentError(err, 'Không thể lưu câu hỏi.'))
+      const uploadErrors = getQuestionUploadErrors(
+        err,
+        'Không thể lưu câu hỏi.',
+      )
+      setServerError(uploadErrors.general ?? null)
+      setServerMediaErrors({
+        image: uploadErrors.image,
+        audio: uploadErrors.audio,
+      })
     } finally {
       setIsSubmitting(false)
+      setUploadProgress(null)
     }
   }
 
@@ -409,12 +437,16 @@ export default function AdminQuestionListPage() {
         question={selectedQuestion}
         isLoading={isSubmitting}
         serverError={serverError}
+        serverMediaErrors={serverMediaErrors}
+        uploadProgress={uploadProgress}
         onSubmit={handleSubmit}
         onClose={() => {
           if (!isSubmitting) {
             setIsFormOpen(false)
             setSelectedQuestion(null)
             setServerError(null)
+            setServerMediaErrors({})
+            setUploadProgress(null)
           }
         }}
       />

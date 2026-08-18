@@ -32,7 +32,14 @@ interface PendingLessonStatus {
 
 import QuestionFormModal from '../../components/admin/QuestionFormModal'
 import { adminQuestionService } from '../../services/admin-question.service'
-import type { CreateQuestionInput } from '../../types/question.types'
+import type {
+  QuestionFormSubmission,
+  QuestionMediaFieldErrors,
+} from '../../types/question.types'
+import {
+  buildQuestionFormData,
+  getQuestionUploadErrors,
+} from '../../utils/question-media'
 
 export default function AdminTopicDetailPage() {
   const { topicId } = useParams<{ topicId: string }>()
@@ -57,6 +64,11 @@ export default function AdminTopicDetailPage() {
   const [isQuestionFormOpen, setIsQuestionFormOpen] = useState(false)
   const [selectedVocabForQuestion, setSelectedVocabForQuestion] = useState<VocabularyResponse | null>(null)
   const [questionServerError, setQuestionServerError] = useState<string | null>(null)
+  const [questionMediaErrors, setQuestionMediaErrors] =
+    useState<QuestionMediaFieldErrors>({})
+  const [questionUploadProgress, setQuestionUploadProgress] = useState<
+    number | null
+  >(null)
 
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [serverNameError, setServerNameError] = useState<string | null>(null)
@@ -69,21 +81,37 @@ export default function AdminTopicDetailPage() {
   const openQuestionFormForVocab = (vocab: VocabularyResponse) => {
     setSelectedVocabForQuestion(vocab)
     setQuestionServerError(null)
+    setQuestionMediaErrors({})
+    setQuestionUploadProgress(null)
     setIsQuestionFormOpen(true)
   }
 
-  const handleQuestionSubmit = async (values: CreateQuestionInput) => {
+  const handleQuestionSubmit = async (values: QuestionFormSubmission) => {
     setIsSubmitting(true)
     setQuestionServerError(null)
+    setQuestionMediaErrors({})
+    setQuestionUploadProgress(0)
     try {
-      await adminQuestionService.createQuestion(values)
+      await adminQuestionService.createQuestion(
+        buildQuestionFormData(values),
+        setQuestionUploadProgress,
+      )
       showNotification('success', `Đã tạo câu hỏi cho từ vựng "${selectedVocabForQuestion?.word ?? ''}".`)
       setIsQuestionFormOpen(false)
       setSelectedVocabForQuestion(null)
     } catch (err: unknown) {
-      setQuestionServerError(getAdminContentError(err, 'Không thể tạo câu hỏi.'))
+      const uploadErrors = getQuestionUploadErrors(
+        err,
+        'Không thể tạo câu hỏi.',
+      )
+      setQuestionServerError(uploadErrors.general ?? null)
+      setQuestionMediaErrors({
+        image: uploadErrors.image,
+        audio: uploadErrors.audio,
+      })
     } finally {
       setIsSubmitting(false)
+      setQuestionUploadProgress(null)
     }
   }
 
@@ -448,12 +476,16 @@ export default function AdminTopicDetailPage() {
         topicVocabularies={vocabularies}
         isLoading={isSubmitting}
         serverError={questionServerError}
+        serverMediaErrors={questionMediaErrors}
+        uploadProgress={questionUploadProgress}
         onSubmit={handleQuestionSubmit}
         onClose={() => {
           if (!isSubmitting) {
             setIsQuestionFormOpen(false)
             setSelectedVocabForQuestion(null)
             setQuestionServerError(null)
+            setQuestionMediaErrors({})
+            setQuestionUploadProgress(null)
           }
         }}
       />

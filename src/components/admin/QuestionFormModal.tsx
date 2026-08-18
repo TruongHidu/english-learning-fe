@@ -1,10 +1,21 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import type {
   CreateQuestionInput,
+  QuestionFormSubmission,
+  QuestionMediaFieldErrors,
   QuestionResponse,
   QuestionType,
 } from '../../types/question.types'
 import type { VocabularyDifficulty, VocabularyResponse } from '../../types/vocabulary.types'
+import {
+  AUDIO_ACCEPT,
+  formatFileSize,
+  IMAGE_ACCEPT,
+  validateQuestionAudio,
+  validateQuestionImage,
+} from '../../utils/question-media'
+
+const OBJECT_ID_PATTERN = /^[0-9a-fA-F]{24}$/
 
 interface QuestionFormModalProps {
   isOpen: boolean
@@ -13,7 +24,9 @@ interface QuestionFormModalProps {
   topicVocabularies?: VocabularyResponse[]
   isLoading: boolean
   serverError?: string | null
-  onSubmit: (values: CreateQuestionInput) => Promise<void>
+  serverMediaErrors?: QuestionMediaFieldErrors
+  uploadProgress?: number | null
+  onSubmit: (values: QuestionFormSubmission) => Promise<void>
   onClose: () => void
 }
 
@@ -24,6 +37,8 @@ export default function QuestionFormModal({
   topicVocabularies = [],
   isLoading,
   serverError,
+  serverMediaErrors,
+  uploadProgress,
   onSubmit,
   onClose,
 }: QuestionFormModalProps) {
@@ -34,9 +49,19 @@ export default function QuestionFormModal({
   const [explanation, setExplanation] = useState('')
   const [difficulty, setDifficulty] = useState<VocabularyDifficulty>('EASY')
   const [correctAnswerText, setCorrectAnswerText] = useState('')
-  const [audioUrl, setAudioUrl] = useState('')
-  const [imageUrl, setImageUrl] = useState('')
   const [selectedVocabIds, setSelectedVocabIds] = useState<string[]>([])
+  const [imageFile, setImageFile] = useState<File | null>(null)
+  const [audioFile, setAudioFile] = useState<File | null>(null)
+  const [existingImageUrl, setExistingImageUrl] = useState<string | null>(null)
+  const [existingAudioUrl, setExistingAudioUrl] = useState<string | null>(null)
+  const [removeImage, setRemoveImage] = useState(false)
+  const [removeAudio, setRemoveAudio] = useState(false)
+  const [imagePreviewUrl, setImagePreviewUrl] = useState<string | null>(null)
+  const [audioPreviewUrl, setAudioPreviewUrl] = useState<string | null>(null)
+  const [imageError, setImageError] = useState<string | null>(null)
+  const [audioError, setAudioError] = useState<string | null>(null)
+  const imageInputRef = useRef<HTMLInputElement>(null)
+  const audioInputRef = useRef<HTMLInputElement>(null)
 
   const [options, setOptions] = useState<
     Array<{ content: string; imageUrl?: string; isCorrect: boolean }>
@@ -58,20 +83,38 @@ export default function QuestionFormModal({
   const [localError, setLocalError] = useState<string | null>(null)
 
   useEffect(() => {
-    if (!isOpen) return
+    if (!isOpen) {
+      setImageFile(null)
+      setAudioFile(null)
+      return
+    }
     setLocalError(null)
+    setImageFile(null)
+    setAudioFile(null)
+    setRemoveImage(false)
+    setRemoveAudio(false)
+    setImageError(null)
+    setAudioError(null)
+    if (imageInputRef.current) imageInputRef.current.value = ''
+    if (audioInputRef.current) audioInputRef.current.value = ''
     if (question) {
       setType(question.type)
       setContent(question.content)
       setInstruction(question.instruction ?? '')
       setExplanation(question.explanation ?? '')
       setDifficulty(question.difficulty ?? 'EASY')
-      setAudioUrl(question.audioUrl ?? '')
-      setImageUrl(question.imageUrl ?? '')
+      setExistingAudioUrl(question.audioUrl)
+      setExistingImageUrl(question.imageUrl)
 
-      const initialVIds = question.vocabularyIds && question.vocabularyIds.length > 0
-        ? question.vocabularyIds
-        : (question.vocabularyId ? [question.vocabularyId] : [])
+      const initialVIds = Array.from(
+        new Set(
+          [
+            ...(question.vocabularies?.map((item) => item.id) ?? []),
+            ...(question.vocabularyIds ?? []),
+            ...(question.vocabularyId ? [question.vocabularyId] : []),
+          ].filter((id) => OBJECT_ID_PATTERN.test(id)),
+        ),
+      )
       setSelectedVocabIds(initialVIds)
 
       setCorrectAnswerText(
@@ -102,8 +145,8 @@ export default function QuestionFormModal({
       setInstruction('')
       setExplanation('')
       setDifficulty('EASY')
-      setAudioUrl('')
-      setImageUrl('')
+      setExistingAudioUrl(null)
+      setExistingImageUrl(null)
       setSelectedVocabIds(vocabularyId ? [vocabularyId] : [])
       setCorrectAnswerText('')
       setOptions([
@@ -119,6 +162,33 @@ export default function QuestionFormModal({
       ])
     }
   }, [isOpen, question, vocabularyId])
+
+  useEffect(() => {
+    setImageError(serverMediaErrors?.image ?? null)
+    setAudioError(serverMediaErrors?.audio ?? null)
+  }, [serverMediaErrors])
+
+  useEffect(() => {
+    if (!imageFile) {
+      setImagePreviewUrl(null)
+      return
+    }
+
+    const objectUrl = URL.createObjectURL(imageFile)
+    setImagePreviewUrl(objectUrl)
+    return () => URL.revokeObjectURL(objectUrl)
+  }, [imageFile])
+
+  useEffect(() => {
+    if (!audioFile) {
+      setAudioPreviewUrl(null)
+      return
+    }
+
+    const objectUrl = URL.createObjectURL(audioFile)
+    setAudioPreviewUrl(objectUrl)
+    return () => URL.revokeObjectURL(objectUrl)
+  }, [audioFile])
 
   if (!isOpen) return null
 
@@ -152,6 +222,61 @@ export default function QuestionFormModal({
     setMatchingPairs((prev) => prev.filter((_, i) => i !== index))
   }
 
+  const handleImageChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.currentTarget.files?.[0]
+    if (!file) return
+
+    const validationError = validateQuestionImage(file)
+    if (validationError) {
+      setImageFile(null)
+      setImageError(validationError)
+      event.currentTarget.value = ''
+      return
+    }
+
+    setImageFile(file)
+    setRemoveImage(false)
+    setImageError(null)
+  }
+
+  const handleAudioChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.currentTarget.files?.[0]
+    if (!file) return
+
+    const validationError = validateQuestionAudio(file)
+    if (validationError) {
+      setAudioFile(null)
+      setAudioError(validationError)
+      event.currentTarget.value = ''
+      return
+    }
+
+    setAudioFile(file)
+    setRemoveAudio(false)
+    setAudioError(null)
+  }
+
+  const clearSelectedImage = () => {
+    setImageFile(null)
+    setImageError(null)
+    if (imageInputRef.current) imageInputRef.current.value = ''
+  }
+
+  const clearSelectedAudio = () => {
+    setAudioFile(null)
+    setAudioError(null)
+    if (audioInputRef.current) audioInputRef.current.value = ''
+  }
+
+  const removeExistingAudio = () => {
+    if (type === 'LISTENING' && !audioFile) {
+      setAudioError('Không thể xóa âm thanh khi câu hỏi vẫn là bài nghe')
+      return
+    }
+    setRemoveAudio(true)
+    setAudioError(null)
+  }
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setLocalError(null)
@@ -166,21 +291,27 @@ export default function QuestionFormModal({
       return
     }
 
-    if (type === 'LISTENING' && !audioUrl.trim()) {
-      setLocalError('Link âm thanh (audioUrl) là bắt buộc đối với bài tập Nghe')
+    const willHaveAudio =
+      Boolean(audioFile) || (!removeAudio && Boolean(existingAudioUrl))
+    if (type === 'LISTENING' && !willHaveAudio) {
+      setAudioError('File âm thanh là bắt buộc cho câu hỏi nghe')
       return
     }
 
     const payload: CreateQuestionInput = {
-      vocabularyId: selectedVocabIds.length > 0 ? selectedVocabIds[0] : undefined,
-      vocabularyIds: selectedVocabIds,
       type,
       content: content.trim(),
       instruction: instruction.trim() || undefined,
       explanation: explanation.trim() || undefined,
       difficulty,
-      audioUrl: audioUrl.trim() || undefined,
-      imageUrl: imageUrl.trim() || undefined,
+    }
+
+    // Khi edit từ Ngân hàng câu hỏi, form không có danh sách từ vựng để chỉnh.
+    // Không gửi lại các ID do API chi tiết trả về để backend giữ nguyên liên kết cũ.
+    if (!isEdit || topicVocabularies.length > 0) {
+      payload.vocabularyId =
+        selectedVocabIds.length > 0 ? selectedVocabIds[0] : undefined
+      payload.vocabularyIds = selectedVocabIds
     }
 
     if (type === 'MULTIPLE_CHOICE') {
@@ -230,8 +361,19 @@ export default function QuestionFormModal({
       }
     }
 
-    await onSubmit(payload)
+    await onSubmit({
+      payload,
+      imageFile,
+      audioFile,
+      removeImage,
+      removeAudio,
+    })
   }
+
+  const displayedImageUrl =
+    imagePreviewUrl ?? (!removeImage ? existingImageUrl : null)
+  const displayedAudioUrl =
+    audioPreviewUrl ?? (!removeAudio ? existingAudioUrl : null)
 
   return (
     <div
@@ -303,7 +445,11 @@ export default function QuestionFormModal({
               <select
                 className="admin-select"
                 value={type}
-                onChange={(e) => setType(e.target.value as QuestionType)}
+                onChange={(e) => {
+                  const nextType = e.target.value as QuestionType
+                  setType(nextType)
+                  if (nextType !== 'LISTENING') setAudioError(null)
+                }}
                 disabled={isEdit}
               >
                 <option value="MULTIPLE_CHOICE">Trắc nghiệm (MULTIPLE_CHOICE)</option>
@@ -365,29 +511,162 @@ export default function QuestionFormModal({
             />
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <div>
-              <label className="block text-xs font-extrabold text-slate-700 mb-1.5">
-                Link Âm thanh (Audio URL) {type === 'LISTENING' ? '*' : ''}
-              </label>
-              <input
-                className="admin-field"
-                placeholder="https://example.com/audio.mp3"
-                value={audioUrl}
-                onChange={(e) => setAudioUrl(e.target.value)}
-              />
-            </div>
-            <div>
-              <label className="block text-xs font-extrabold text-slate-700 mb-1.5">
-                Link Hình ảnh minh họa (Image URL)
-              </label>
-              <input
-                className="admin-field"
-                placeholder="https://example.com/image.png"
-                value={imageUrl}
-                onChange={(e) => setImageUrl(e.target.value)}
-              />
-            </div>
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+            <section className="space-y-3 rounded-xl border border-slate-200 bg-slate-50 p-4">
+              <div>
+                <label
+                  className="block text-xs font-extrabold text-slate-700 mb-1.5"
+                  htmlFor="question-image-file"
+                >
+                  Ảnh minh họa
+                </label>
+                <input
+                  ref={imageInputRef}
+                  id="question-image-file"
+                  type="file"
+                  accept={IMAGE_ACCEPT}
+                  className="block w-full text-xs text-slate-600 file:mr-3 file:rounded-lg file:border-0 file:bg-emerald-100 file:px-3 file:py-2 file:font-bold file:text-emerald-800 hover:file:bg-emerald-200"
+                  onChange={handleImageChange}
+                  disabled={isLoading}
+                />
+                <p className="mt-1 text-[11px] text-slate-500">
+                  JPEG, PNG, WebP hoặc GIF · tối đa 5 MB
+                </p>
+              </div>
+
+              {displayedImageUrl ? (
+                <div className="space-y-2">
+                  <img
+                    src={displayedImageUrl}
+                    alt={imageFile ? 'Xem trước ảnh mới' : 'Ảnh câu hỏi hiện tại'}
+                    className="h-36 w-full rounded-lg border border-slate-200 bg-white object-contain"
+                  />
+                  {imageFile ? (
+                    <div className="flex items-center justify-between gap-2 text-[11px]">
+                      <span className="min-w-0 truncate font-semibold text-slate-600">
+                        {imageFile.name} · {formatFileSize(imageFile.size)}
+                      </span>
+                      <button
+                        type="button"
+                        className="shrink-0 font-bold text-rose-600"
+                        onClick={clearSelectedImage}
+                        disabled={isLoading}
+                      >
+                        Bỏ file
+                      </button>
+                    </div>
+                  ) : (
+                    <button
+                      type="button"
+                      className="text-xs font-bold text-rose-600"
+                      onClick={() => {
+                        setRemoveImage(true)
+                        setImageError(null)
+                      }}
+                      disabled={isLoading}
+                    >
+                      Xóa ảnh hiện tại
+                    </button>
+                  )}
+                </div>
+              ) : null}
+
+              {removeImage && existingImageUrl && !imageFile ? (
+                <div className="flex items-center justify-between rounded-lg bg-amber-50 px-3 py-2 text-xs text-amber-800">
+                  <span>Ảnh hiện tại sẽ bị xóa.</span>
+                  <button
+                    type="button"
+                    className="font-bold"
+                    onClick={() => setRemoveImage(false)}
+                    disabled={isLoading}
+                  >
+                    Hoàn tác
+                  </button>
+                </div>
+              ) : null}
+
+              {imageError ? (
+                <p className="text-xs font-semibold text-rose-600" role="alert">
+                  {imageError}
+                </p>
+              ) : null}
+            </section>
+
+            <section className="space-y-3 rounded-xl border border-slate-200 bg-slate-50 p-4">
+              <div>
+                <label
+                  className="block text-xs font-extrabold text-slate-700 mb-1.5"
+                  htmlFor="question-audio-file"
+                >
+                  File âm thanh {type === 'LISTENING' ? '*' : ''}
+                </label>
+                <input
+                  ref={audioInputRef}
+                  id="question-audio-file"
+                  type="file"
+                  accept={AUDIO_ACCEPT}
+                  className="block w-full text-xs text-slate-600 file:mr-3 file:rounded-lg file:border-0 file:bg-sky-100 file:px-3 file:py-2 file:font-bold file:text-sky-800 hover:file:bg-sky-200"
+                  onChange={handleAudioChange}
+                  disabled={isLoading}
+                />
+                <p className="mt-1 text-[11px] text-slate-500">
+                  MP3, WAV, OGG, MP4 hoặc WebM · tối đa 20 MB
+                </p>
+              </div>
+
+              {displayedAudioUrl ? (
+                <div className="space-y-2">
+                  <audio controls src={displayedAudioUrl} className="w-full" />
+                  {audioFile ? (
+                    <div className="flex items-center justify-between gap-2 text-[11px]">
+                      <span className="min-w-0 truncate font-semibold text-slate-600">
+                        {audioFile.name} · {formatFileSize(audioFile.size)}
+                      </span>
+                      <button
+                        type="button"
+                        className="shrink-0 font-bold text-rose-600"
+                        onClick={clearSelectedAudio}
+                        disabled={isLoading}
+                      >
+                        Bỏ file
+                      </button>
+                    </div>
+                  ) : (
+                    <button
+                      type="button"
+                      className="text-xs font-bold text-rose-600"
+                      onClick={removeExistingAudio}
+                      disabled={isLoading}
+                    >
+                      Xóa âm thanh hiện tại
+                    </button>
+                  )}
+                </div>
+              ) : null}
+
+              {removeAudio && existingAudioUrl && !audioFile ? (
+                <div className="flex items-center justify-between rounded-lg bg-amber-50 px-3 py-2 text-xs text-amber-800">
+                  <span>Âm thanh hiện tại sẽ bị xóa.</span>
+                  <button
+                    type="button"
+                    className="font-bold"
+                    onClick={() => {
+                      setRemoveAudio(false)
+                      setAudioError(null)
+                    }}
+                    disabled={isLoading}
+                  >
+                    Hoàn tác
+                  </button>
+                </div>
+              ) : null}
+
+              {audioError ? (
+                <p className="text-xs font-semibold text-rose-600" role="alert">
+                  {audioError}
+                </p>
+              ) : null}
+            </section>
           </div>
 
           {type === 'MULTIPLE_CHOICE' ? (
@@ -575,6 +854,21 @@ export default function QuestionFormModal({
               onChange={(e) => setExplanation(e.target.value)}
             />
           </div>
+
+          {isLoading && uploadProgress !== null && uploadProgress !== undefined ? (
+            <div className="space-y-1.5" role="status" aria-live="polite">
+              <div className="flex justify-between text-xs font-bold text-slate-600">
+                <span>Đang tải dữ liệu lên...</span>
+                <span>{uploadProgress}%</span>
+              </div>
+              <div className="h-2 overflow-hidden rounded-full bg-slate-200">
+                <div
+                  className="h-full rounded-full bg-emerald-500 transition-[width]"
+                  style={{ width: `${uploadProgress}%` }}
+                />
+              </div>
+            </div>
+          ) : null}
 
           <div className="flex justify-end gap-3 pt-3 border-t border-slate-100">
             <button

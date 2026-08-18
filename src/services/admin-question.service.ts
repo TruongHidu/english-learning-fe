@@ -1,6 +1,5 @@
 import api from '../api/axios'
 import type {
-  CreateQuestionInput,
   EmptyQuestionResponse,
   GetAdminQuestionDetailResponse,
   GetAdminQuestionsResponse,
@@ -10,8 +9,20 @@ import type {
   QuestionListQuery,
   QuestionResponse,
   QuestionStatus,
-  UpdateQuestionInput,
 } from '../types/question.types'
+
+export type QuestionUploadProgressHandler = (percent: number) => void
+
+function getUploadConfig(onProgress?: QuestionUploadProgressHandler) {
+  if (!onProgress) return undefined
+
+  return {
+    onUploadProgress: (event: { loaded: number; total?: number }) => {
+      if (!event.total) return
+      onProgress(Math.round((event.loaded * 100) / event.total))
+    },
+  }
+}
 
 export const adminQuestionService = {
   async getQuestions(
@@ -48,22 +59,30 @@ export const adminQuestionService = {
     return response.data.data.question
   },
 
-  async createQuestion(input: CreateQuestionInput): Promise<QuestionResponse> {
+  async createQuestion(
+    formData: FormData,
+    onProgress?: QuestionUploadProgressHandler,
+  ): Promise<QuestionResponse> {
     const response = await api.post<GetAdminQuestionDetailResponse>(
       '/admin/questions',
-      input,
+      formData,
+      getUploadConfig(onProgress),
     )
+    onProgress?.(100)
     return response.data.data.question
   },
 
   async updateQuestion(
     questionId: string,
-    input: UpdateQuestionInput,
+    formData: FormData,
+    onProgress?: QuestionUploadProgressHandler,
   ): Promise<QuestionResponse> {
     const response = await api.patch<GetAdminQuestionDetailResponse>(
       `/admin/questions/${questionId}`,
-      input,
+      formData,
+      getUploadConfig(onProgress),
     )
+    onProgress?.(100)
     return response.data.data.question
   },
 

@@ -85,8 +85,8 @@ export interface CreateQuestionInput {
   matchingPairs?: MatchingPair[]
   explanation?: string
   difficulty: VocabularyDifficulty
-  audioUrl?: string
-  imageUrl?: string
+  audioUrl?: string | null
+  imageUrl?: string | null
 }
 
 export interface UpdateQuestionInput {
@@ -100,8 +100,21 @@ export interface UpdateQuestionInput {
   matchingPairs?: MatchingPair[]
   explanation?: string
   difficulty?: VocabularyDifficulty
-  audioUrl?: string
-  imageUrl?: string
+  audioUrl?: string | null
+  imageUrl?: string | null
+}
+
+export interface QuestionFormSubmission {
+  payload: CreateQuestionInput
+  imageFile: File | null
+  audioFile: File | null
+  removeImage: boolean
+  removeAudio: boolean
+}
+
+export interface QuestionMediaFieldErrors {
+  image?: string
+  audio?: string
 }
 
 

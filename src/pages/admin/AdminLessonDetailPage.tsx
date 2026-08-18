@@ -16,10 +16,11 @@ import { adminVocabularyService } from '../../services/admin-vocabulary.service'
 import type { ContentStatus } from '../../types/course.types'
 import type { LessonResponse } from '../../types/lesson.types'
 import type {
-  CreateQuestionInput,
   LessonQuestionResponse,
+  QuestionFormSubmission,
   QuestionResponse,
   QuestionListItemResponse,
+  QuestionMediaFieldErrors,
   QuestionType,
 } from '../../types/question.types'
 import type { VocabularyDifficulty, VocabularyResponse } from '../../types/vocabulary.types'
@@ -30,6 +31,10 @@ import {
 
 import { vietnameseIncludes } from '../../utils/vietnamese'
 import QuestionPreviewModal from '../../components/admin/QuestionPreviewModal'
+import {
+  buildQuestionFormData,
+  getQuestionUploadErrors,
+} from '../../utils/question-media'
 
 export default function AdminLessonDetailPage() {
   const { lessonId } = useParams<{ lessonId: string }>()
@@ -58,6 +63,11 @@ export default function AdminLessonDetailPage() {
     useState(false)
   const [createQuestionError, setCreateQuestionError] = useState<
     string | null
+  >(null)
+  const [createQuestionMediaErrors, setCreateQuestionMediaErrors] =
+    useState<QuestionMediaFieldErrors>({})
+  const [questionUploadProgress, setQuestionUploadProgress] = useState<
+    number | null
   >(null)
 
 
@@ -208,15 +218,22 @@ export default function AdminLessonDetailPage() {
 
   const openCreateQuestionModal = () => {
     setCreateQuestionError(null)
+    setCreateQuestionMediaErrors({})
+    setQuestionUploadProgress(null)
     setIsCreateQuestionModalOpen(true)
   }
 
-  const handleCreateQuestionSubmit = async (values: CreateQuestionInput) => {
+  const handleCreateQuestionSubmit = async (values: QuestionFormSubmission) => {
     if (!lessonId) return
     setIsSubmitting(true)
     setCreateQuestionError(null)
+    setCreateQuestionMediaErrors({})
+    setQuestionUploadProgress(0)
     try {
-      const createdQuestion = await adminQuestionService.createQuestion(values)
+      const createdQuestion = await adminQuestionService.createQuestion(
+        buildQuestionFormData(values),
+        setQuestionUploadProgress,
+      )
       const updatedList = await adminQuestionService.assignQuestionsToLesson(
         lessonId,
         [createdQuestion.id],
@@ -228,11 +245,18 @@ export default function AdminLessonDetailPage() {
       showNotification('success', 'Đã tạo và gán câu hỏi mới vào bài học.')
       setIsCreateQuestionModalOpen(false)
     } catch (err: unknown) {
-      setCreateQuestionError(
-        getAdminContentError(err, 'Không thể tạo và gán câu hỏi.'),
+      const uploadErrors = getQuestionUploadErrors(
+        err,
+        'Không thể tạo và gán câu hỏi.',
       )
+      setCreateQuestionError(uploadErrors.general ?? null)
+      setCreateQuestionMediaErrors({
+        image: uploadErrors.image,
+        audio: uploadErrors.audio,
+      })
     } finally {
       setIsSubmitting(false)
+      setQuestionUploadProgress(null)
     }
   }
 
@@ -574,11 +598,15 @@ export default function AdminLessonDetailPage() {
         topicVocabularies={topicVocabularies}
         isLoading={isSubmitting}
         serverError={createQuestionError}
+        serverMediaErrors={createQuestionMediaErrors}
+        uploadProgress={questionUploadProgress}
         onSubmit={handleCreateQuestionSubmit}
         onClose={() => {
           if (!isSubmitting) {
             setIsCreateQuestionModalOpen(false)
             setCreateQuestionError(null)
+            setCreateQuestionMediaErrors({})
+            setQuestionUploadProgress(null)
           }
         }}
       />
