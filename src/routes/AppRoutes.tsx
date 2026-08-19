@@ -25,6 +25,9 @@ import AuthPage from '../pages/auth/AuthPage'
 import ForbiddenPage from '../pages/errors/ForbiddenPage'
 import CourseSectionsPage from '../pages/learn/CourseSectionsPage'
 import LearnPage from '../pages/learn/LearnPage'
+import StartLessonPage from '../pages/learn/StartLessonPage'
+import SectionTopicsPage from '../pages/learn/SectionTopicsPage'
+import TopicLearningPathPage from '../pages/learn/TopicLearningPathPage'
 import ProfilePage from '../pages/profile/ProfilePage'
 
 function DashboardRedirect() {
@@ -60,6 +63,9 @@ function AppRoutes() {
         >
           <Route path="/learn" element={<LearnPage />} />
           <Route path="/learn/courses/:courseId" element={<CourseSectionsPage />} />
+          <Route path="/learn/courses/:courseId/sections/:sectionId" element={<SectionTopicsPage />} />
+          <Route path="/learn/topics/:topicId" element={<TopicLearningPathPage />} />
+          <Route path="/learn/lessons/:lessonId/start" element={<StartLessonPage />} />
           <Route
             path="/pronunciation"
             element={<AppSectionPage section="pronunciation" />}

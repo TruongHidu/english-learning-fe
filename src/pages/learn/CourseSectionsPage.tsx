@@ -124,7 +124,7 @@ export default function CourseSectionsPage() {
               ) : (
                 <div className="space-y-4">
                   {sections.map((section) => (
-                    <SectionCard key={section.id} section={section} />
+                    <SectionCard key={section.id} courseId={courseId} section={section} />
                   ))}
                 </div>
               )}

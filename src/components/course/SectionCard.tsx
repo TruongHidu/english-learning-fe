@@ -1,10 +1,13 @@
+import { useNavigate } from 'react-router-dom'
 import type { SectionResponse } from '../../types/course.types'
 
 interface SectionCardProps {
+  courseId: string
   section: SectionResponse
 }
 
-export default function SectionCard({ section }: SectionCardProps) {
+export default function SectionCard({ courseId, section }: SectionCardProps) {
+  const navigate = useNavigate()
   return (
     <article className="bg-white rounded-2xl p-5 border-2 border-slate-200 shadow-[0_4px_0_#e2e8f0] flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
       <div className="flex items-start gap-4">
@@ -31,8 +34,8 @@ export default function SectionCard({ section }: SectionCardProps) {
       <div className="w-full md:w-auto shrink-0">
         <button
           type="button"
-          disabled
-          className="w-full md:w-auto px-5 py-2.5 rounded-xl font-extrabold text-xs text-slate-500 bg-slate-100 border border-slate-200 cursor-not-allowed uppercase tracking-wider text-center flex items-center justify-center gap-2"
+          onClick={() => navigate(`/learn/courses/${courseId}/sections/${section.id}`, { state: { section } })}
+          className="w-full md:w-auto px-5 py-2.5 rounded-xl font-extrabold text-xs text-white bg-emerald-500 hover:bg-emerald-600 border border-emerald-600 shadow-[0_4px_0_#047857] active:translate-y-1 active:shadow-none focus-visible:outline-3 focus-visible:outline-offset-2 focus-visible:outline-emerald-400 transition-all cursor-pointer uppercase tracking-wider text-center flex items-center justify-center gap-2"
         >
           <span>⏳</span>
           <span>Sắp có bài học</span>
