@@ -6,6 +6,7 @@ interface LessonProgressBarProps {
   hearts: number
   maxHearts: number
   backUrl?: string
+  onRequestExit?: () => void
 }
 
 export default function LessonProgressBar({
@@ -14,35 +15,50 @@ export default function LessonProgressBar({
   hearts,
   maxHearts,
   backUrl = '/learn',
+  onRequestExit,
 }: LessonProgressBarProps) {
   const percent = total > 0 ? Math.min(100, (current / total) * 100) : 0
+  const closeIcon = (
+    <svg
+      width="24"
+      height="24"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="3"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    >
+      <path d="M18 6L6 18M6 6l12 12" />
+    </svg>
+  )
 
   return (
     <header className="mb-8 flex items-center justify-between gap-4">
-      <Link
-        to={backUrl}
-        className="learning-back-action rounded-xl p-2 hover:bg-slate-100 transition-colors focus-visible:outline-3 focus-visible:outline-offset-2 focus-visible:outline-sky-400"
-        aria-label="Thoát bài học"
-        title="Thoát"
-      >
-        <svg
-          width="24"
-          height="24"
-          viewBox="0 0 24 24"
-          fill="none"
-          stroke="currentColor"
-          strokeWidth="3"
-          strokeLinecap="round"
-          strokeLinejoin="round"
-          className="text-slate-400"
+      {onRequestExit ? (
+        <button
+          type="button"
+          className="lesson-progress-close rounded-xl p-2 focus-visible:outline-3 focus-visible:outline-offset-2 focus-visible:outline-sky-400"
+          onClick={onRequestExit}
+          aria-label="Thoát bài học"
+          title="Thoát"
         >
-          <path d="M18 6L6 18M6 6l12 12" />
-        </svg>
-      </Link>
+          {closeIcon}
+        </button>
+      ) : (
+        <Link
+          to={backUrl}
+          className="lesson-progress-close rounded-xl p-2 focus-visible:outline-3 focus-visible:outline-offset-2 focus-visible:outline-sky-400"
+          aria-label="Thoát bài học"
+          title="Thoát"
+        >
+          {closeIcon}
+        </Link>
+      )}
       
       <div className="flex-1 max-w-2xl">
         <div 
-          className="learning-progress-track h-4 overflow-hidden rounded-full bg-slate-200 w-full"
+          className="lesson-progress-track h-4 w-full overflow-hidden rounded-full"
           role="progressbar" 
           aria-valuemin={0} 
           aria-valuemax={total} 

@@ -1,10 +1,20 @@
-import { useState, useEffect } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import type { LearningQuestion } from '../../types/learning.types'
 
 interface MatchingQuestionProps {
   question: LearningQuestion
   disabled: boolean
   onComplete: (pairs: string[]) => void
+}
+
+interface CompletedPair {
+  number: number
+  left: string
+  right: string
+}
+
+function encodePairs(pairs: CompletedPair[]): string[] {
+  return pairs.map((pair) => `${pair.left}||${pair.right}`)
 }
 
 export default function MatchingQuestion({
@@ -14,89 +24,162 @@ export default function MatchingQuestion({
 }: MatchingQuestionProps) {
   const [selectedLeft, setSelectedLeft] = useState<string | null>(null)
   const [selectedRight, setSelectedRight] = useState<string | null>(null)
-  const [completedPairs, setCompletedPairs] = useState<string[]>([])
-  
+  const [completedPairs, setCompletedPairs] = useState<CompletedPair[]>([])
+  const nextPairNumberRef = useRef(1)
+
   const leftItems = question.matchingLeftItems ?? []
   const rightItems = question.matchingRightItems ?? []
   const totalPairs = Math.min(leftItems.length, rightItems.length)
 
   useEffect(() => {
-    // If user selected both left and right, form a pair
-    if (selectedLeft && selectedRight) {
-      const newPair = `${selectedLeft}-${selectedRight}`
-      
-      // Update completed pairs
-      const updatedPairs = [...completedPairs, newPair]
-      setCompletedPairs(updatedPairs)
-      
-      // Reset selection
-      setSelectedLeft(null)
-      setSelectedRight(null)
-      
-      // Notify parent if all pairs are formed
-      if (updatedPairs.length === totalPairs) {
-        onComplete(updatedPairs)
-      }
-    }
-  }, [selectedLeft, selectedRight, completedPairs, totalPairs, onComplete])
-  
-  // Also, if the component receives a new question, reset state
+    if (selectedLeft === null || selectedRight === null) return
+
+    const updatedPairs = [
+      ...completedPairs,
+      {
+        number: nextPairNumberRef.current++,
+        left: selectedLeft,
+        right: selectedRight,
+      },
+    ]
+
+    setCompletedPairs(updatedPairs)
+    setSelectedLeft(null)
+    setSelectedRight(null)
+    onComplete(encodePairs(updatedPairs))
+  }, [selectedLeft, selectedRight, completedPairs, onComplete])
+
   useEffect(() => {
     setSelectedLeft(null)
     setSelectedRight(null)
     setCompletedPairs([])
-  }, [question.id])
+    nextPairNumberRef.current = 1
+    onComplete([])
+  }, [question.id, onComplete])
 
-  const isLeftMatched = (item: string) => completedPairs.some(p => p.split('-')[0] === item)
-  const isRightMatched = (item: string) => completedPairs.some(p => p.split('-')[1] === item)
+  function getLeftPair(item: string): CompletedPair | undefined {
+    return completedPairs.find((pair) => pair.left === item)
+  }
+
+  function getRightPair(item: string): CompletedPair | undefined {
+    return completedPairs.find((pair) => pair.right === item)
+  }
+
+  function removePair(pairToRemove: CompletedPair) {
+    const updatedPairs = completedPairs.filter(
+      (pair) =>
+        pair.left !== pairToRemove.left || pair.right !== pairToRemove.right,
+    )
+    setCompletedPairs(updatedPairs)
+    onComplete(encodePairs(updatedPairs))
+  }
+
+  function handleLeftClick(item: string) {
+    if (disabled) return
+
+    const matchedPair = getLeftPair(item)
+    if (matchedPair) {
+      removePair(matchedPair)
+      return
+    }
+
+    setSelectedLeft((current) => (current === item ? null : item))
+  }
+
+  function handleRightClick(item: string) {
+    if (disabled) return
+
+    const matchedPair = getRightPair(item)
+    if (matchedPair) {
+      removePair(matchedPair)
+      return
+    }
+
+    setSelectedRight((current) => (current === item ? null : item))
+  }
+
+  function getButtonClass(isMatched: boolean, isSelected: boolean): string {
+    return `lesson-answer-option lesson-answer-option--matching lesson-match-option ${
+      isMatched
+        ? 'lesson-answer-option--matched'
+        : isSelected
+          ? 'lesson-answer-option--selected'
+          : 'lesson-answer-option--idle'
+    }`
+  }
 
   return (
-    <div className="mt-6 grid grid-cols-2 gap-3 md:gap-6">
-      {/* Left Column */}
+    <div
+      className="mt-6 grid grid-cols-2 gap-3 md:gap-6"
+      aria-label={`Nối các cặp từ, đã nối ${completedPairs.length} trên ${totalPairs}`}
+    >
       <div className="space-y-3">
         {leftItems.map((item) => {
-          const isMatched = isLeftMatched(item)
+          const matchedPair = getLeftPair(item)
+          const pairNumber = matchedPair?.number ?? null
           const isSelected = selectedLeft === item
+
           return (
             <button
               key={`left-${item}`}
               type="button"
-              disabled={disabled || isMatched}
-              onClick={() => setSelectedLeft(isSelected ? null : item)}
-              className={`w-full rounded-2xl border-2 px-4 py-4 text-center text-sm md:text-base font-bold transition-all relative outline-none ${
-                isMatched
-                  ? 'opacity-30 border-slate-200 bg-slate-50 cursor-not-allowed text-slate-400'
+              disabled={disabled}
+              onClick={() => handleLeftClick(item)}
+              className={getButtonClass(Boolean(matchedPair), isSelected)}
+              aria-label={`${item}${pairNumber ? `, cặp số ${pairNumber}` : ''}`}
+              title={
+                pairNumber
+                  ? `Bấm để bỏ nối cặp số ${pairNumber}`
                   : isSelected
-                  ? 'border-sky-400 bg-sky-50 text-sky-600 shadow-[0_2px_0_#38bdf8] scale-[0.98]'
-                  : 'border-slate-200 bg-white text-slate-700 shadow-[0_2px_0_#e2e8f0] hover:bg-slate-50 hover:border-slate-300 cursor-pointer active:translate-y-[2px] active:shadow-none'
-              }`}
+                    ? 'Bấm để bỏ chọn'
+                    : `Chọn ${item}`
+              }
             >
-              {item}
+              <span
+                className={`lesson-match-number${
+                  pairNumber ? ' lesson-match-number--active' : ''
+                }`}
+                aria-hidden="true"
+              >
+                {pairNumber ?? '·'}
+              </span>
+              <span>{item}</span>
             </button>
           )
         })}
       </div>
 
-      {/* Right Column */}
       <div className="space-y-3">
         {rightItems.map((item) => {
-          const isMatched = isRightMatched(item)
+          const matchedPair = getRightPair(item)
+          const pairNumber = matchedPair?.number ?? null
           const isSelected = selectedRight === item
+
           return (
             <button
               key={`right-${item}`}
               type="button"
-              disabled={disabled || isMatched}
-              onClick={() => setSelectedRight(isSelected ? null : item)}
-              className={`w-full rounded-2xl border-2 px-4 py-4 text-center text-sm md:text-base font-bold transition-all relative outline-none ${
-                isMatched
-                  ? 'opacity-30 border-slate-200 bg-slate-50 cursor-not-allowed text-slate-400'
+              disabled={disabled}
+              onClick={() => handleRightClick(item)}
+              className={getButtonClass(Boolean(matchedPair), isSelected)}
+              aria-label={`${item}${pairNumber ? `, cặp số ${pairNumber}` : ''}`}
+              title={
+                pairNumber
+                  ? `Bấm để bỏ nối cặp số ${pairNumber}`
                   : isSelected
-                  ? 'border-sky-400 bg-sky-50 text-sky-600 shadow-[0_2px_0_#38bdf8] scale-[0.98]'
-                  : 'border-slate-200 bg-white text-slate-700 shadow-[0_2px_0_#e2e8f0] hover:bg-slate-50 hover:border-slate-300 cursor-pointer active:translate-y-[2px] active:shadow-none'
-              }`}
+                    ? 'Bấm để bỏ chọn'
+                    : `Chọn ${item}`
+              }
             >
-              {item}
+              <span
+                className={`lesson-match-number${
+                  pairNumber ? ' lesson-match-number--active' : ''
+                }`}
+                aria-hidden="true"
+              >
+                {pairNumber ?? '·'}
+              </span>
+              <span>{item}</span>
             </button>
           )
         })}

@@ -71,14 +71,21 @@ export function AuthProvider({ children }: AuthProviderProps) {
   }, [navigate])
 
   const updateCachedUser = useCallback((patch: AuthUserCachePatch) => {
-    setUser((currentUser) =>
-      currentUser
-        ? {
-            ...currentUser,
-            ...patch,
-          }
-        : currentUser,
-    )
+    setUser((currentUser) => {
+      if (!currentUser) return currentUser
+
+      const { stats, ...userPatch } = patch
+      return {
+        ...currentUser,
+        ...userPatch,
+        stats: stats
+          ? {
+              ...currentUser.stats,
+              ...stats,
+            }
+          : currentUser.stats,
+      }
+    })
   }, [])
 
   useEffect(() => {

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useLocation, useNavigate, useParams } from 'react-router-dom'
 import { normalizeApiError } from '../../api/api-error'
 import LessonPath from '../../components/learning/LessonPath'
@@ -15,6 +15,11 @@ import { getLearningPathErrorMessage } from '../../utils/learning-errors'
 interface LocationState {
   section?: Pick<UserCourseSectionResponse, 'name' | 'description'>
   notice?: string
+}
+
+interface LessonScrollItem {
+  lesson: LearningPathLesson
+  topicName: string
 }
 
 function getProgressLabel(status: ProgressStatus): string {
@@ -39,9 +44,26 @@ export default function SectionTopicsPage() {
   const location = useLocation()
   const locationState = (location.state ?? {}) as LocationState
   const [section, setSection] = useState<UserCourseSectionResponse | null>(null)
+  const [sectionPosition, setSectionPosition] = useState<number | null>(null)
   const [topicPaths, setTopicPaths] = useState<SectionTopicLearningPath[]>([])
+  const [activeLessonId, setActiveLessonId] = useState<string | null>(null)
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const lessonPathRef = useRef<HTMLDivElement>(null)
+
+  const lessonScrollItems = useMemo<LessonScrollItem[]>(
+    () =>
+      topicPaths.flatMap(({ topic, lessons }) =>
+        lessons.map((lesson) => ({ lesson, topicName: topic.name })),
+      ),
+    [topicPaths],
+  )
+
+  const activeLessonIndex = Math.max(
+    0,
+    lessonScrollItems.findIndex(({ lesson }) => lesson.id === activeLessonId),
+  )
+  const activeLessonItem = lessonScrollItems[activeLessonIndex]
 
   const loadSectionPath = useCallback(async () => {
     if (!courseId || !sectionId) {
@@ -55,33 +77,53 @@ export default function SectionTopicsPage() {
 
     try {
       const sections = await courseService.getPublishedSections(courseId)
-      const currentSection = sections.find((item) => item.id === sectionId)
+      const currentSectionIndex = sections.findIndex((item) => item.id === sectionId)
+      const currentSection = sections[currentSectionIndex]
 
       if (!currentSection) {
         setSection(null)
+        setSectionPosition(null)
         setTopicPaths([])
+        setActiveLessonId(null)
         setError('Không tìm thấy phần học.')
         return
       }
 
       setSection(currentSection)
+      setSectionPosition(currentSectionIndex + 1)
       if (currentSection.isLocked) {
         setTopicPaths([])
+        setActiveLessonId(null)
         setError('Bạn cần hoàn thành tất cả bài học trong phần học trước.')
         return
       }
 
-      setTopicPaths(await learningPathService.getSectionLearningPath(sectionId))
+      const nextTopicPaths = await learningPathService.getSectionLearningPath(sectionId)
+      const nextLessonIds = new Set(
+        nextTopicPaths.flatMap(({ lessons }) => lessons.map((lesson) => lesson.id)),
+      )
+
+      setTopicPaths(nextTopicPaths)
+      setActiveLessonId((currentLessonId) =>
+        currentLessonId && nextLessonIds.has(currentLessonId)
+          ? currentLessonId
+          : nextTopicPaths[0]?.lessons[0]?.id ?? null,
+      )
     } catch (requestError) {
       const apiError = normalizeApiError(requestError)
       setTopicPaths([])
+      setActiveLessonId(null)
       setError(getLearningPathErrorMessage(apiError))
 
       if (apiError.code === 'SECTION_LOCKED') {
         try {
           const refreshedSections = await courseService.getPublishedSections(courseId)
-          setSection(
-            refreshedSections.find((item) => item.id === sectionId) ?? null,
+          const refreshedSectionIndex = refreshedSections.findIndex(
+            (item) => item.id === sectionId,
+          )
+          setSection(refreshedSections[refreshedSectionIndex] ?? null)
+          setSectionPosition(
+            refreshedSectionIndex >= 0 ? refreshedSectionIndex + 1 : null,
           )
         } catch {
           // Giữ lỗi khóa gốc nếu lần refetch section cũng thất bại.
@@ -95,6 +137,80 @@ export default function SectionTopicsPage() {
   useEffect(() => {
     void loadSectionPath()
   }, [loadSectionPath])
+
+  useEffect(() => {
+    const pathElement = lessonPathRef.current
+    if (!pathElement || lessonScrollItems.length === 0) return
+
+    let animationFrame: number | null = null
+
+    const updateActiveLesson = () => {
+      animationFrame = null
+      const lessonElements = pathElement.querySelectorAll<HTMLElement>(
+        '[data-lesson-id]',
+      )
+      if (lessonElements.length === 0) return
+
+      const isAtPageStart = window.scrollY <= 2
+      const isAtPageEnd =
+        window.scrollY + window.innerHeight >=
+        document.documentElement.scrollHeight - 2
+
+      if (isAtPageStart || isAtPageEnd) {
+        const edgeLesson = isAtPageStart
+          ? lessonElements.item(0)
+          : lessonElements.item(lessonElements.length - 1)
+        const edgeLessonId = edgeLesson.dataset.lessonId
+
+        if (edgeLessonId) {
+          setActiveLessonId((currentLessonId) =>
+            currentLessonId === edgeLessonId ? currentLessonId : edgeLessonId,
+          )
+        }
+        return
+      }
+
+      const viewportTarget = window.innerHeight * 0.5
+      let closestLessonId: string | undefined
+      let closestDistance = Number.POSITIVE_INFINITY
+
+      lessonElements.forEach((lessonElement) => {
+        const bounds = lessonElement.getBoundingClientRect()
+        const lessonCenter = bounds.top + bounds.height / 2
+        const distance = Math.abs(lessonCenter - viewportTarget)
+
+        if (distance < closestDistance) {
+          closestDistance = distance
+          closestLessonId = lessonElement.dataset.lessonId
+        }
+      })
+
+      if (closestLessonId) {
+        setActiveLessonId((currentLessonId) =>
+          currentLessonId === closestLessonId
+            ? currentLessonId
+            : closestLessonId ?? currentLessonId,
+        )
+      }
+    }
+
+    const scheduleUpdate = () => {
+      if (animationFrame !== null) return
+      animationFrame = window.requestAnimationFrame(updateActiveLesson)
+    }
+
+    updateActiveLesson()
+    window.addEventListener('scroll', scheduleUpdate, { passive: true })
+    window.addEventListener('resize', scheduleUpdate)
+
+    return () => {
+      window.removeEventListener('scroll', scheduleUpdate)
+      window.removeEventListener('resize', scheduleUpdate)
+      if (animationFrame !== null) {
+        window.cancelAnimationFrame(animationFrame)
+      }
+    }
+  }, [lessonScrollItems])
 
   const openLesson = (lesson: LearningPathLesson) => {
     if (lesson.isLocked || !courseId || !sectionId) return
@@ -111,42 +227,44 @@ export default function SectionTopicsPage() {
     })
   }
 
-  const sectionName = section?.name ?? locationState.section?.name ?? 'Lộ trình Section'
-  const sectionDescription =
-    section?.description ?? locationState.section?.description
-
   return (
     <main className="section-main pb-12">
-      <button
-        type="button"
-        onClick={() => navigate(`/learn/courses/${courseId ?? ''}`)}
-        className="learning-back-action mb-5 rounded-xl px-3 py-2 text-xs font-black uppercase tracking-wider focus-visible:outline-3 focus-visible:outline-offset-2 focus-visible:outline-sky-400"
-      >
-        ← Quay lại khóa học
-      </button>
-
-      <header className="mb-8">
-        <p className="text-xs font-black uppercase tracking-widest text-emerald-600">
-          Lộ trình học tập
-        </p>
-        <h1 className="learning-heading-color mt-1 text-2xl font-black md:text-3xl">
-          {sectionName}
-        </h1>
-        {sectionDescription ? (
-          <p className="learning-muted-color mt-2 max-w-2xl text-sm">
-            {sectionDescription}
-          </p>
-        ) : null}
-        {section ? (
-          <div className="learning-muted-color mt-3 flex flex-wrap items-center gap-3 text-xs font-black uppercase tracking-wider">
-            <span>{getProgressLabel(section.progressStatus)}</span>
-            <span aria-hidden="true">•</span>
-            <span>
-              {section.completedLessonCount}/{section.totalLessonCount} bài học
-            </span>
+      {!isLoading && !error && activeLessonItem ? (
+        <aside className="section-lesson-banner" aria-label="Bài học hiện tại">
+          <div className="section-lesson-banner__copy">
+            <div className="section-lesson-banner__meta">
+              <button
+                type="button"
+                className="section-lesson-banner__back"
+                onClick={() => navigate(`/learn/courses/${courseId ?? ''}`)}
+                aria-label="Quay lại khóa học"
+                title="Quay lại khóa học"
+              >
+                ←
+              </button>
+              <p>Phần {sectionPosition ?? 1}, Cửa {activeLessonIndex + 1}</p>
+            </div>
+            <h2>{activeLessonItem.lesson.name}</h2>
+            <span>{activeLessonItem.topicName}</span>
           </div>
-        ) : null}
-      </header>
+          <button
+            type="button"
+            disabled={activeLessonItem.lesson.isLocked}
+            onClick={() => openLesson(activeLessonItem.lesson)}
+          >
+            <span aria-hidden="true">
+              {activeLessonItem.lesson.isLocked ? '🔒' : '▶'}
+            </span>
+            {activeLessonItem.lesson.isLocked
+              ? 'Đã khóa'
+              : activeLessonItem.lesson.isCompleted
+                ? 'Học lại'
+                : activeLessonItem.lesson.progressStatus === 'IN_PROGRESS'
+                  ? 'Tiếp tục'
+                  : 'Bắt đầu'}
+          </button>
+        </aside>
+      ) : null}
 
       {locationState.notice ? (
         <div className="mb-6 rounded-2xl border-2 border-amber-300 bg-amber-50 p-4 text-sm font-bold text-amber-800" role="status">
@@ -206,7 +324,7 @@ export default function SectionTopicsPage() {
       ) : null}
 
       {!isLoading && !error && topicPaths.length > 0 ? (
-        <div className="space-y-16">
+        <div ref={lessonPathRef} className="space-y-16">
           {topicPaths.map(({ topic, lessons }) => (
             <section key={topic.id} aria-labelledby={`topic-${topic.id}`}>
               <div className="flex items-center gap-4">

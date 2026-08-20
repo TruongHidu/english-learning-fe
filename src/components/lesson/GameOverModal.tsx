@@ -23,7 +23,7 @@ export default function GameOverModal({ isOpen, courseId, sectionId, onRetry }: 
         aria-modal="true"
         aria-labelledby="game-over-title"
       >
-        <div className="mx-auto mb-6 flex h-24 w-24 items-center justify-center rounded-full bg-rose-100 text-6xl shadow-inner">
+        <div className="lesson-game-over-icon mx-auto mb-6 flex h-24 w-24 items-center justify-center rounded-full text-6xl shadow-inner">
           💔
         </div>
         
@@ -46,7 +46,7 @@ export default function GameOverModal({ isOpen, courseId, sectionId, onRetry }: 
           
           <Link
             to={backUrl}
-            className="w-full rounded-xl border-2 border-slate-200 bg-white px-5 py-3.5 text-sm font-black uppercase tracking-wider text-slate-500 transition-all hover:bg-slate-50 hover:text-slate-600 focus-visible:outline-3 focus-visible:outline-offset-2 focus-visible:outline-slate-400"
+            className="lesson-secondary-action w-full rounded-xl border-2 px-5 py-3.5 text-sm font-black uppercase tracking-wider transition-all focus-visible:outline-3 focus-visible:outline-offset-2 focus-visible:outline-slate-400"
           >
             Về trang học
           </Link>

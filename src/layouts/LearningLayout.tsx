@@ -1,4 +1,4 @@
-import { NavLink, Outlet } from 'react-router-dom'
+import { NavLink, Outlet, useLocation } from 'react-router-dom'
 import HeartMenu from '../components/navigation/HeartMenu'
 import MoreMenu from '../components/navigation/MoreMenu'
 import SidebarIcon from '../components/navigation/SidebarIcon'
@@ -40,9 +40,11 @@ function GemIcon() {
 
 export default function LearningLayout() {
   const { logout, user } = useAuth()
+  const location = useLocation()
+  const isLessonRoute = location.pathname.startsWith('/learn/lessons/')
 
   return (
-    <div className="learning-shell">
+    <div className={`learning-shell${isLessonRoute ? ' learning-shell--lesson' : ''}`}>
       <aside className="learning-sidebar">
         <NavLink className="app-brand" to="/learn" aria-label="LingoFox - Học">
           lingofox

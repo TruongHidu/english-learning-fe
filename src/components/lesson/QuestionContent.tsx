@@ -6,9 +6,9 @@ interface QuestionContentProps {
 
 export default function QuestionContent({ question }: QuestionContentProps) {
   return (
-    <article className="mb-8">
+    <article className="lesson-question-content mb-8">
       {question.instruction && (
-        <h2 className="mb-4 text-xl font-black md:text-2xl text-slate-700">
+        <h2 className="lesson-question-instruction mb-4 text-xl font-black md:text-2xl">
           {question.instruction}
         </h2>
       )}
@@ -45,7 +45,7 @@ export default function QuestionContent({ question }: QuestionContentProps) {
         <img 
           src={question.imageUrl} 
           alt="Minh họa câu hỏi" 
-          className="mt-6 max-h-64 rounded-2xl object-cover border-2 border-slate-200" 
+          className="lesson-question-image mt-6 max-h-64 rounded-2xl border-2 object-cover" 
         />
       )}
     </article>

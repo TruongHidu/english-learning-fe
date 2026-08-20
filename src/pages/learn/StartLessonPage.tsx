@@ -6,14 +6,18 @@ import type { StartLessonData, SubmitAnswerResult } from '../../types/learning.t
 import type { UserCourseSectionResponse } from '../../types/course.types'
 import type { LearningPathLesson } from '../../types/learning-path.types'
 import { getStartLessonErrorMessage } from '../../utils/learning-errors'
+import { useAuth } from '../../hooks/useAuth'
 
 import LessonProgressBar from '../../components/lesson/LessonProgressBar'
 import QuestionContent from '../../components/lesson/QuestionContent'
 import CheckFooter, { type CheckFooterState } from '../../components/lesson/CheckFooter'
 import GameOverModal from '../../components/lesson/GameOverModal'
+import ExitLessonModal from '../../components/lesson/ExitLessonModal'
 import LessonComplete from '../../components/lesson/LessonComplete'
 import MultipleChoiceQuestion from '../../components/lesson/MultipleChoiceQuestion'
 import MatchingQuestion from '../../components/lesson/MatchingQuestion'
+import FillBlankQuestion from '../../components/lesson/FillBlankQuestion'
+import '../../components/lesson/LessonQuiz.css'
 
 interface StartLessonLocationState {
   lesson?: LearningPathLesson
@@ -26,6 +30,7 @@ export default function StartLessonPage() {
   const { lessonId } = useParams<{ lessonId: string }>()
   const navigate = useNavigate()
   const location = useLocation()
+  const { updateCachedUser } = useAuth()
   const {
     lesson: initialLesson,
     courseId,
@@ -43,6 +48,7 @@ export default function StartLessonPage() {
   const [checkResult, setCheckResult] = useState<SubmitAnswerResult | null>(null)
   const [isGameOver, setIsGameOver] = useState(false)
   const [isComplete, setIsComplete] = useState(false)
+  const [isExitConfirmOpen, setIsExitConfirmOpen] = useState(false)
 
   // Use a ref for AudioContext to avoid creating it multiple times
   const audioCtxRef = useRef<AudioContext | null>(null)
@@ -93,7 +99,14 @@ export default function StartLessonPage() {
     setStartError(null)
 
     try {
-      setLearningData(await learningService.startLesson(lessonId))
+      const nextLearningData = await learningService.startLesson(lessonId)
+      setLearningData(nextLearningData)
+      updateCachedUser({
+        stats: {
+          currentHeart: nextLearningData.hearts.current,
+          maxHeart: nextLearningData.hearts.max,
+        },
+      })
       // Reset quiz state
       setSelectedAnswer(null)
       setCheckResult(null)
@@ -122,13 +135,25 @@ export default function StartLessonPage() {
   }
 
   async function handleCheck() {
-    if (!selectedAnswer || isSubmitting || !learningData || !question) return
+    const submittedAnswer =
+      typeof selectedAnswer === 'string' ? selectedAnswer.trim() : selectedAnswer
+
+    if (
+      !submittedAnswer ||
+      isSubmitting ||
+      !learningData ||
+      !question
+    ) return
 
     setIsSubmitting(true)
     try {
       const result = await learningService.submitAnswer(learningData.session.id, {
         questionId: question.id,
-        answer: selectedAnswer,
+        answer: submittedAnswer,
+      })
+
+      updateCachedUser({
+        stats: { currentHeart: result.heartsRemaining },
       })
 
       setCheckResult(result)
@@ -212,13 +237,14 @@ export default function StartLessonPage() {
 
     return (
       <>
-        <main className="mx-auto flex min-h-[100dvh] w-full max-w-3xl flex-col px-4 py-8 md:px-8 pb-32" aria-live="polite">
+        <main className="lesson-quiz-page mx-auto flex min-h-[100dvh] w-full max-w-3xl flex-col px-4 py-8 pb-32 md:px-8" aria-live="polite">
           <LessonProgressBar
             current={currentQuestionIndex + 1}
             total={totalQuestions}
             hearts={learningData.hearts.current}
             maxHearts={learningData.hearts.max}
             backUrl={backUrl}
+            onRequestExit={() => setIsExitConfirmOpen(true)}
           />
 
           {question ? (
@@ -244,16 +270,30 @@ export default function StartLessonPage() {
                   onComplete={setSelectedAnswer}
                 />
               )}
+
+              {/* Fill in the blank */}
+              {question.type === 'FILL_BLANK' && (
+                <FillBlankQuestion
+                  question={question}
+                  answer={typeof selectedAnswer === 'string' ? selectedAnswer : ''}
+                  disabled={isSubmitting || checkResult !== null}
+                  checkResult={checkResult}
+                  onChange={setSelectedAnswer}
+                  onSubmit={() => void handleCheck()}
+                />
+              )}
               
               {/* Other types placeholders */}
-              {question.type !== 'MULTIPLE_CHOICE' && question.type !== 'MATCHING' && (
-                <div className="rounded-xl bg-amber-50 p-6 text-center text-sm font-bold text-amber-800 flex-1 mt-6">
+              {question.type !== 'MULTIPLE_CHOICE' &&
+                question.type !== 'MATCHING' &&
+                question.type !== 'FILL_BLANK' && (
+                <div className="lesson-alert lesson-alert--warning mt-6 flex-1 rounded-xl p-6 text-center text-sm font-bold">
                   Loại câu hỏi này ({question.type}) chưa được hỗ trợ hiển thị.
                 </div>
               )}
             </div>
           ) : (
-            <div className="rounded-xl bg-amber-50 p-6 text-center text-sm font-bold text-amber-800 flex-1">
+            <div className="lesson-alert lesson-alert--warning flex-1 rounded-xl p-6 text-center text-sm font-bold">
               Bài học chưa có câu hỏi khả dụng. Vui lòng quay lại và thử lại sau.
             </div>
           )}
@@ -262,7 +302,11 @@ export default function StartLessonPage() {
         {question && (
           <CheckFooter
             state={footerState}
-            isDisabled={!selectedAnswer}
+            isDisabled={
+              typeof selectedAnswer === 'string'
+                ? selectedAnswer.trim().length === 0
+                : !selectedAnswer
+            }
             correctAnswer={typeof checkResult?.correctAnswer === 'string' ? checkResult.correctAnswer : Array.isArray(checkResult?.correctAnswer) ? checkResult.correctAnswer.join(', ') : undefined}
             explanation={checkResult?.explanation}
             onCheck={() => void handleCheck()}
@@ -275,6 +319,12 @@ export default function StartLessonPage() {
           courseId={courseId}
           sectionId={sectionId}
           onRetry={() => void handleStart()}
+        />
+
+        <ExitLessonModal
+          isOpen={isExitConfirmOpen}
+          onContinue={() => setIsExitConfirmOpen(false)}
+          onExit={() => navigate(backUrl)}
         />
       </>
     )
@@ -292,19 +342,19 @@ export default function StartLessonPage() {
         <p className="learning-muted-color mb-7 text-sm leading-relaxed">{lesson?.description ?? 'Hãy sẵn sàng trả lời câu hỏi và chinh phục bài học này.'}</p>
 
         <dl className="mb-8 grid grid-cols-2 gap-3">
-          <div className="rounded-xl bg-sky-50 p-4"><dt className="text-xs font-black uppercase tracking-wider text-sky-700">Cần đạt</dt><dd className="mt-1 text-2xl font-black text-sky-800">{lesson?.requiredScore ?? '—'}{lesson ? '%' : ''}</dd></div>
-          <div className="rounded-xl bg-emerald-50 p-4"><dt className="text-xs font-black uppercase tracking-wider text-emerald-700">Câu hỏi</dt><dd className="mt-1 text-2xl font-black text-emerald-800">{lesson?.questionCount ?? '—'}</dd></div>
+          <div className="lesson-start-stat lesson-start-stat--score rounded-xl p-4"><dt className="text-xs font-black uppercase tracking-wider">Cần đạt</dt><dd className="mt-1 text-2xl font-black">{lesson?.requiredScore ?? '—'}{lesson ? '%' : ''}</dd></div>
+          <div className="lesson-start-stat lesson-start-stat--questions rounded-xl p-4"><dt className="text-xs font-black uppercase tracking-wider">Câu hỏi</dt><dd className="mt-1 text-2xl font-black">{lesson?.questionCount ?? '—'}</dd></div>
         </dl>
 
-        {startError && <div className="mb-5 rounded-xl border-2 border-rose-200 bg-rose-50 p-4 text-sm font-bold text-rose-700" role="alert">{startError}</div>}
-        <button type="button" disabled={!lessonId || isStarting || initialLesson?.isLocked} onClick={() => void handleStart()} className="w-full rounded-xl bg-emerald-500 px-5 py-3.5 text-sm font-black uppercase tracking-wider text-white shadow-[0_4px_0_#047857] transition-all hover:bg-emerald-600 active:translate-y-1 active:shadow-none disabled:cursor-not-allowed disabled:bg-slate-300 disabled:shadow-none focus-visible:outline-3 focus-visible:outline-offset-2 focus-visible:outline-emerald-400">
+        {startError && <div className="lesson-alert lesson-alert--error mb-5 rounded-xl p-4 text-sm font-bold" role="alert">{startError}</div>}
+        <button type="button" disabled={!lessonId || isStarting || initialLesson?.isLocked} onClick={() => void handleStart()} className="lesson-primary-action w-full rounded-xl bg-emerald-500 px-5 py-3.5 text-sm font-black uppercase tracking-wider text-white shadow-[0_4px_0_#047857] transition-all hover:bg-emerald-600 active:translate-y-1 active:shadow-none focus-visible:outline-3 focus-visible:outline-offset-2 focus-visible:outline-emerald-400">
           {initialLesson?.isLocked
             ? 'Bài học đang khóa'
             : isStarting
               ? 'Đang bắt đầu...'
               : 'Bắt đầu học'}
         </button>
-        {startError && <button type="button" onClick={() => void handleStart()} disabled={isStarting} className="mt-4 w-full text-sm font-black text-emerald-600 underline underline-offset-4 disabled:text-slate-400">Thử lại</button>}
+        {startError && <button type="button" onClick={() => void handleStart()} disabled={isStarting} className="lesson-retry-action mt-4 w-full text-sm font-black text-emerald-600 underline underline-offset-4">Thử lại</button>}
       </section>
     </main>
   )

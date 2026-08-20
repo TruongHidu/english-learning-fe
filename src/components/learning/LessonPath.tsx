@@ -50,6 +50,7 @@ export default function LessonPath({ lessons, onSelectLesson }: LessonPathProps)
         return (
           <li
             key={lesson.id}
+            data-lesson-id={lesson.id}
             className={`lesson-path-item ${
               alignLeft ? 'lesson-path-item--left' : 'lesson-path-item--right'
             }`}
