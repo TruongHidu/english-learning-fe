@@ -1,54 +1,25 @@
-import { useState } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useLocation, useNavigate, useParams } from 'react-router-dom'
 import { normalizeApiError } from '../../api/api-error'
 import { learningService } from '../../services/learning.service'
-import type { LearningQuestion, StartLessonData } from '../../types/learning.types'
+import type { StartLessonData, SubmitAnswerResult } from '../../types/learning.types'
 import type { UserCourseSectionResponse } from '../../types/course.types'
 import type { LearningPathLesson } from '../../types/learning-path.types'
 import { getStartLessonErrorMessage } from '../../utils/learning-errors'
+
+import LessonProgressBar from '../../components/lesson/LessonProgressBar'
+import QuestionContent from '../../components/lesson/QuestionContent'
+import CheckFooter, { type CheckFooterState } from '../../components/lesson/CheckFooter'
+import GameOverModal from '../../components/lesson/GameOverModal'
+import LessonComplete from '../../components/lesson/LessonComplete'
+import MultipleChoiceQuestion from '../../components/lesson/MultipleChoiceQuestion'
+import MatchingQuestion from '../../components/lesson/MatchingQuestion'
 
 interface StartLessonLocationState {
   lesson?: LearningPathLesson
   courseId?: string
   sectionId?: string
   section?: Pick<UserCourseSectionResponse, 'name' | 'description'>
-}
-
-function QuestionPlaceholder({ question }: { question: LearningQuestion }) {
-  if (question.type === 'MATCHING') {
-    return (
-      <div className="grid grid-cols-2 gap-3" aria-label="Khu vực ghép đôi">
-        <div className="space-y-2">
-          {question.matchingLeftItems?.map((item) => (
-            <div key={item} className="learning-surface--soft learning-heading-color rounded-xl border-2 p-3 text-sm font-bold">{item}</div>
-          ))}
-        </div>
-        <div className="space-y-2">
-          {question.matchingRightItems?.map((item) => (
-            <div key={item} className="learning-surface--soft learning-heading-color rounded-xl border-2 p-3 text-sm font-bold">{item}</div>
-          ))}
-        </div>
-      </div>
-    )
-  }
-
-  if (question.type === 'FILL_BLANK' || question.type === 'TRANSLATION') {
-    return <input disabled className="learning-surface--soft learning-heading-color w-full rounded-xl border-2 px-4 py-3 text-sm" placeholder="Nhập câu trả lời ở bước tiếp theo" />
-  }
-
-  if (question.type === 'ORDER_SENTENCE') {
-    return <div className="learning-surface--soft learning-muted-color rounded-xl border-2 border-dashed p-5 text-center text-sm font-bold">Khu vực sắp xếp câu sẽ có ở bước tiếp theo.</div>
-  }
-
-  return (
-    <div className="space-y-3">
-      {question.options?.map((option) => (
-        <button key={option.id ?? option.orderIndex} type="button" disabled className="learning-surface learning-heading-color w-full rounded-xl border-2 px-4 py-3 text-left text-sm font-bold">
-          {option.content}
-        </button>
-      ))}
-    </div>
-  )
 }
 
 export default function StartLessonPage() {
@@ -61,17 +32,56 @@ export default function StartLessonPage() {
     sectionId,
     section,
   } = (location.state ?? {}) as StartLessonLocationState
+  
   const [isStarting, setIsStarting] = useState(false)
   const [startError, setStartError] = useState<string | null>(null)
   const [learningData, setLearningData] = useState<StartLessonData | null>(null)
+  
+  // Quiz State
+  const [selectedAnswer, setSelectedAnswer] = useState<string | string[] | null>(null)
+  const [isSubmitting, setIsSubmitting] = useState(false)
+  const [checkResult, setCheckResult] = useState<SubmitAnswerResult | null>(null)
+  const [isGameOver, setIsGameOver] = useState(false)
+  const [isComplete, setIsComplete] = useState(false)
+
+  // Use a ref for AudioContext to avoid creating it multiple times
+  const audioCtxRef = useRef<AudioContext | null>(null)
 
   const lesson = learningData?.lesson ?? initialLesson
   const totalQuestions = learningData?.progress.totalQuestions ?? lesson?.questionCount ?? 0
-  const displayCurrentQuestion = learningData ? learningData.progress.currentQuestionIndex + 1 : 0
-  const progressPercent = totalQuestions > 0 && learningData
-    ? Math.min(100, (displayCurrentQuestion / totalQuestions) * 100)
-    : 0
-  const question = learningData?.questions[learningData.progress.currentQuestionIndex] ?? null
+  const currentQuestionIndex = learningData?.progress.currentQuestionIndex ?? 0
+  const question = learningData?.questions[currentQuestionIndex] ?? null
+
+  // Sound effect for correct answer
+  useEffect(() => {
+    if (checkResult?.isCorrect) {
+      try {
+        if (!audioCtxRef.current) {
+          audioCtxRef.current = new (window.AudioContext || (window as any).webkitAudioContext)()
+        }
+        const ctx = audioCtxRef.current
+        if (ctx.state === 'suspended') ctx.resume()
+        
+        const osc = ctx.createOscillator()
+        const gainNode = ctx.createGain()
+        
+        osc.type = 'sine'
+        osc.frequency.setValueAtTime(800, ctx.currentTime)
+        osc.frequency.exponentialRampToValueAtTime(1200, ctx.currentTime + 0.1)
+        
+        gainNode.gain.setValueAtTime(0.5, ctx.currentTime)
+        gainNode.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.3)
+        
+        osc.connect(gainNode)
+        gainNode.connect(ctx.destination)
+        
+        osc.start()
+        osc.stop(ctx.currentTime + 0.3)
+      } catch (err) {
+        console.error('Audio playback failed', err)
+      }
+    }
+  }, [checkResult])
 
   async function handleStart() {
     if (!lessonId || isStarting) return
@@ -84,6 +94,11 @@ export default function StartLessonPage() {
 
     try {
       setLearningData(await learningService.startLesson(lessonId))
+      // Reset quiz state
+      setSelectedAnswer(null)
+      setCheckResult(null)
+      setIsGameOver(false)
+      setIsComplete(false)
     } catch (error) {
       const apiError = normalizeApiError(error)
       const message = getStartLessonErrorMessage(apiError)
@@ -106,42 +121,168 @@ export default function StartLessonPage() {
     }
   }
 
-  if (learningData) {
-    return (
-      <main className="mx-auto w-full max-w-3xl px-4 py-8 md:px-8" aria-live="polite">
-        <header className="mb-8 flex items-center justify-between gap-4">
-          <button type="button" onClick={() => navigate(-1)} className="learning-back-action rounded-xl px-3 py-2 text-sm font-black focus-visible:outline-3 focus-visible:outline-offset-2 focus-visible:outline-sky-400">← Thoát</button>
-          <div className="rounded-xl bg-rose-50 px-4 py-2 font-black text-rose-500">❤️ {learningData.hearts.current} / {learningData.hearts.max}</div>
-        </header>
+  async function handleCheck() {
+    if (!selectedAnswer || isSubmitting || !learningData || !question) return
 
-        <section className="learning-surface learning-surface--raised rounded-2xl border-2 p-5 md:p-8">
-          <div className="mb-7">
-            <div className="learning-muted-color mb-2 flex items-center justify-between gap-4 text-xs font-black uppercase tracking-wider">
-              <span>Tiến độ</span>
-              <span>{displayCurrentQuestion} / {totalQuestions}</span>
-            </div>
-            <div className="learning-progress-track h-4 overflow-hidden rounded-full" role="progressbar" aria-valuemin={0} aria-valuemax={totalQuestions} aria-valuenow={displayCurrentQuestion}>
-              <div className="h-full rounded-full bg-emerald-500 transition-all" style={{ width: `${progressPercent}%` }} />
-            </div>
-          </div>
+    setIsSubmitting(true)
+    try {
+      const result = await learningService.submitAnswer(learningData.session.id, {
+        questionId: question.id,
+        answer: selectedAnswer,
+      })
+
+      setCheckResult(result)
+      
+      // Update local state with API results (from SubmitAnswerResult)
+      setLearningData(prev => {
+        if (!prev) return prev
+        return {
+          ...prev,
+          hearts: {
+            ...prev.hearts,
+            current: result.heartsRemaining, // Updated from API
+          },
+          session: {
+            ...prev.session,
+            heartRemaining: result.heartsRemaining,
+            correctCount: result.correctCount,
+            wrongCount: result.wrongCount,
+            status: result.sessionStatus,
+          }
+        }
+      })
+    } catch (error) {
+      const apiError = normalizeApiError(error)
+      console.error(apiError.message)
+    } finally {
+      setIsSubmitting(false)
+    }
+  }
+
+  function handleContinue() {
+    if (!learningData || !checkResult) return
+
+    if (checkResult.sessionStatus === 'FAILED' || learningData.hearts.current === 0) {
+      setIsGameOver(true)
+      return
+    }
+
+    const nextIndex = currentQuestionIndex + 1
+    if (nextIndex >= totalQuestions || checkResult.sessionStatus === 'COMPLETED') {
+      setIsComplete(true)
+      return
+    }
+
+    // Move to next question
+    setLearningData(prev => {
+      if (!prev) return prev
+      return {
+        ...prev,
+        progress: {
+          ...prev.progress,
+          currentQuestionIndex: nextIndex,
+        }
+      }
+    })
+    
+    // Reset selection
+    setSelectedAnswer(null)
+    setCheckResult(null)
+  }
+
+  // Derive footer state
+  let footerState: CheckFooterState = 'idle'
+  if (isSubmitting) footerState = 'loading'
+  else if (checkResult) footerState = checkResult.isCorrect ? 'correct' : 'incorrect'
+
+  // ---------------------------------------------------------------------------
+  // Render: Complete
+  // ---------------------------------------------------------------------------
+  if (isComplete && learningData) {
+    return <LessonComplete session={learningData.session} courseId={courseId} sectionId={sectionId} />
+  }
+
+  // ---------------------------------------------------------------------------
+  // Render: Quiz
+  // ---------------------------------------------------------------------------
+  if (learningData) {
+    const backUrl = courseId && sectionId 
+      ? `/learn/courses/${courseId}/sections/${sectionId}` 
+      : '/learn'
+
+    return (
+      <>
+        <main className="mx-auto flex min-h-[100dvh] w-full max-w-3xl flex-col px-4 py-8 md:px-8 pb-32" aria-live="polite">
+          <LessonProgressBar
+            current={currentQuestionIndex + 1}
+            total={totalQuestions}
+            hearts={learningData.hearts.current}
+            maxHearts={learningData.hearts.max}
+            backUrl={backUrl}
+          />
 
           {question ? (
-            <article>
-              {question.instruction && <p className="mb-3 text-sm font-black uppercase tracking-wider text-emerald-600">{question.instruction}</p>}
-              <h1 className="learning-heading-color mb-6 text-2xl font-black md:text-3xl">{question.content}</h1>
-              {question.imageUrl && <img src={question.imageUrl} alt="Minh họa câu hỏi" className="mb-6 max-h-64 rounded-2xl object-cover" />}
-              {question.audioUrl && <audio className="mb-6 w-full" controls src={question.audioUrl}>Trình duyệt không hỗ trợ phát âm thanh.</audio>}
-              <QuestionPlaceholder question={question} />
-              <p className="learning-subtle-color mt-6 text-center text-xs font-bold">Chức năng trả lời sẽ được triển khai ở bước tiếp theo.</p>
-            </article>
+            <div className="flex-1">
+              <QuestionContent question={question} />
+
+              {/* Multiple Choice Component */}
+              {question.type === 'MULTIPLE_CHOICE' && (
+                <MultipleChoiceQuestion
+                  question={question}
+                  selectedAnswer={typeof selectedAnswer === 'string' ? selectedAnswer : null}
+                  isSubmitting={isSubmitting}
+                  checkResult={checkResult ? { isCorrect: checkResult.isCorrect } : null}
+                  onSelect={setSelectedAnswer}
+                />
+              )}
+
+              {/* Matching Component */}
+              {question.type === 'MATCHING' && (
+                <MatchingQuestion
+                  question={question}
+                  disabled={isSubmitting || checkResult !== null}
+                  onComplete={setSelectedAnswer}
+                />
+              )}
+              
+              {/* Other types placeholders */}
+              {question.type !== 'MULTIPLE_CHOICE' && question.type !== 'MATCHING' && (
+                <div className="rounded-xl bg-amber-50 p-6 text-center text-sm font-bold text-amber-800 flex-1 mt-6">
+                  Loại câu hỏi này ({question.type}) chưa được hỗ trợ hiển thị.
+                </div>
+              )}
+            </div>
           ) : (
-            <div className="rounded-xl bg-amber-50 p-6 text-center text-sm font-bold text-amber-800">Bài học chưa có câu hỏi khả dụng. Vui lòng quay lại và thử lại sau.</div>
+            <div className="rounded-xl bg-amber-50 p-6 text-center text-sm font-bold text-amber-800 flex-1">
+              Bài học chưa có câu hỏi khả dụng. Vui lòng quay lại và thử lại sau.
+            </div>
           )}
-        </section>
-      </main>
+        </main>
+
+        {question && (
+          <CheckFooter
+            state={footerState}
+            isDisabled={!selectedAnswer}
+            correctAnswer={typeof checkResult?.correctAnswer === 'string' ? checkResult.correctAnswer : Array.isArray(checkResult?.correctAnswer) ? checkResult.correctAnswer.join(', ') : undefined}
+            explanation={checkResult?.explanation}
+            onCheck={() => void handleCheck()}
+            onContinue={handleContinue}
+          />
+        )}
+
+        <GameOverModal
+          isOpen={isGameOver}
+          courseId={courseId}
+          sectionId={sectionId}
+          onRetry={() => void handleStart()}
+        />
+      </>
     )
   }
 
+  // ---------------------------------------------------------------------------
+  // Render: Start Screen
+  // ---------------------------------------------------------------------------
   return (
     <main className="mx-auto w-full max-w-2xl px-4 py-8 md:px-8">
       <section className="learning-surface learning-surface--raised rounded-2xl border-2 p-6 md:p-9">

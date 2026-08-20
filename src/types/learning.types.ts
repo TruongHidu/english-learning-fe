@@ -54,3 +54,20 @@ export interface StartLessonData {
 }
 
 export type StartLessonResponse = ApiSuccess<StartLessonData>
+
+export interface SubmitAnswerPayload {
+  questionId: string
+  answer: string | string[]
+}
+
+export interface SubmitAnswerResult {
+  isCorrect: boolean
+  correctAnswer?: unknown
+  explanation?: string | null
+  heartsRemaining: number
+  sessionStatus: 'IN_PROGRESS' | 'COMPLETED' | 'FAILED' | 'ABANDONED'
+  correctCount: number
+  wrongCount: number
+}
+
+export type SubmitAnswerResponse = ApiSuccess<SubmitAnswerResult>
