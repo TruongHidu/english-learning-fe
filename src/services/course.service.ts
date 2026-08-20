@@ -4,7 +4,7 @@ import type {
   GetCourseResponse,
   GetPublishedCoursesResponse,
   GetPublishedSectionsResponse,
-  SectionResponse,
+  UserCourseSectionResponse,
 } from '../types/course.types'
 
 export const courseService = {
@@ -18,8 +18,10 @@ export const courseService = {
     return response.data.data.course
   },
 
-  async getPublishedSections(courseId: string): Promise<SectionResponse[]> {
+  async getPublishedSections(courseId: string): Promise<UserCourseSectionResponse[]> {
     const response = await api.get<GetPublishedSectionsResponse>(`/courses/${courseId}/sections`)
-    return response.data.data.sections
+    return [...response.data.data.sections].sort(
+      (first, second) => first.orderIndex - second.orderIndex,
+    )
   },
 }

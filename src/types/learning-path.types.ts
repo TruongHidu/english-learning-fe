@@ -1,6 +1,7 @@
 import type { ApiSuccess } from './api.types'
 
-export type LessonProgressStatus = 'LOCKED' | 'UNLOCKED' | 'IN_PROGRESS' | 'COMPLETED'
+export type ProgressStatus = 'LOCKED' | 'UNLOCKED' | 'IN_PROGRESS' | 'COMPLETED'
+export type LessonProgressStatus = ProgressStatus
 
 export interface UserTopic {
   id: string
@@ -9,6 +10,11 @@ export interface UserTopic {
   description: string | null
   orderIndex: number
   lessonCount: number
+  totalLessonCount: number
+  progressStatus: ProgressStatus
+  isLocked: boolean
+  isCompleted: boolean
+  completedLessonCount: number
 }
 
 export interface LearningPathLesson {
@@ -20,14 +26,31 @@ export interface LearningPathLesson {
   questionCount: number
   xpReward: number
   diamondReward: number
-  progressStatus: LessonProgressStatus
+  progressStatus: ProgressStatus
   isLocked: boolean
+  isCompleted: boolean
   bestScore: number
   totalAttempts: number
 }
 
+export interface UserTopicSummary {
+  id: string
+  name: string
+  description: string | null
+  progressStatus: ProgressStatus
+  isLocked: boolean
+  isCompleted: boolean
+  completedLessonCount: number
+  totalLessonCount: number
+}
+
 export interface TopicLearningPath {
-  topic: Pick<UserTopic, 'id' | 'name' | 'description'>
+  topic: UserTopicSummary
+  lessons: LearningPathLesson[]
+}
+
+export interface SectionTopicLearningPath {
+  topic: UserTopic
   lessons: LearningPathLesson[]
 }
 

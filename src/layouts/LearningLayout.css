@@ -518,6 +518,47 @@
   min-height: calc(100vh - 172px);
 }
 
+.learning-surface {
+  color: var(--heading-color);
+  background: var(--surface-bg);
+  border-color: var(--surface-border);
+}
+
+.learning-surface--raised {
+  box-shadow: 0 4px 0 var(--surface-shadow);
+}
+
+.learning-surface--soft,
+.learning-skeleton {
+  background: var(--surface-soft-bg);
+  border-color: var(--surface-border);
+}
+
+.learning-heading-color {
+  color: var(--heading-color);
+}
+
+.learning-muted-color {
+  color: var(--muted-color);
+}
+
+.learning-subtle-color {
+  color: var(--subtle-color);
+}
+
+.learning-back-action {
+  color: var(--muted-color);
+}
+
+.learning-back-action:hover {
+  color: #10b981;
+  background: var(--surface-soft-bg);
+}
+
+.learning-progress-track {
+  background: var(--surface-border);
+}
+
 .section-heading {
   padding: 24px 4px;
   border-bottom: 2px solid var(--page-border);

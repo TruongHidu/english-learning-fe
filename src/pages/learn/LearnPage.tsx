@@ -39,10 +39,10 @@ export default function LearnPage() {
           <span className="text-xs font-black uppercase tracking-widest text-emerald-600">
             LỘ TRÌNH HỌC TẬP
           </span>
-          <h1 className="text-2xl md:text-3xl font-black text-slate-800 mt-1">
+          <h1 className="learning-heading-color text-2xl md:text-3xl font-black mt-1">
             Chọn khóa học
           </h1>
-          <p className="text-slate-500 text-sm mt-1">
+          <p className="learning-muted-color text-sm mt-1">
             Chọn khóa học phù hợp với trình độ để bắt đầu hành trình học tiếng Anh của bạn.
           </p>
         </header>
@@ -52,7 +52,7 @@ export default function LearnPage() {
             {[1, 2, 3, 4].map((n) => (
               <div
                 key={n}
-                className="h-72 rounded-2xl bg-slate-100 animate-pulse border-2 border-slate-200"
+                className="learning-skeleton h-72 rounded-2xl animate-pulse border-2"
               />
             ))}
           </div>
@@ -76,12 +76,12 @@ export default function LearnPage() {
         )}
 
         {!isLoading && !error && courses.length === 0 && (
-          <div className="bg-white border-2 border-slate-200 rounded-2xl p-10 text-center shadow-[0_4px_0_#e2e8f0]">
+          <div className="learning-surface learning-surface--raised border-2 rounded-2xl p-10 text-center">
             <span className="text-5xl block mb-3">📚</span>
-            <h2 className="text-xl font-extrabold text-slate-800 mb-2">
+            <h2 className="learning-heading-color text-xl font-extrabold mb-2">
               Chưa có khóa học nào được phát hành
             </h2>
-            <p className="text-sm text-slate-500 max-w-md mx-auto">
+            <p className="learning-muted-color text-sm max-w-md mx-auto">
               Các khóa học đang được biên soạn và sẽ sớm có mặt. Vui lòng quay lại sau!
             </p>
           </div>

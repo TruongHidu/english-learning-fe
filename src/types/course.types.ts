@@ -1,3 +1,5 @@
+import type { ProgressStatus } from './learning-path.types'
+
 export type ContentStatus = 'DRAFT' | 'PUBLISHED' | 'INACTIVE'
 
 export interface CourseResponse {
@@ -21,6 +23,14 @@ export interface SectionResponse {
   status: ContentStatus
   createdAt: string
   updatedAt: string
+}
+
+export interface UserCourseSectionResponse extends SectionResponse {
+  progressStatus: ProgressStatus
+  isLocked: boolean
+  isCompleted: boolean
+  completedLessonCount: number
+  totalLessonCount: number
 }
 
 export interface PaginationMeta {
@@ -94,7 +104,7 @@ export interface GetPublishedSectionsResponse {
   success: true
   message: string
   data: {
-    sections: SectionResponse[]
+    sections: UserCourseSectionResponse[]
   }
 }
 
