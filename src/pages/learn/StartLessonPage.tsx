@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, useCallback } from 'react'
 import { useLocation, useNavigate, useParams } from 'react-router-dom'
 import { normalizeApiError } from '../../api/api-error'
 import { learningService } from '../../services/learning.service'
@@ -52,11 +52,15 @@ export default function StartLessonPage() {
 
   // Use a ref for AudioContext to avoid creating it multiple times
   const audioCtxRef = useRef<AudioContext | null>(null)
+  const startedLessonRef = useRef<string | null>(null)
 
   const lesson = learningData?.lesson ?? initialLesson
   const totalQuestions = learningData?.progress.totalQuestions ?? lesson?.questionCount ?? 0
   const currentQuestionIndex = learningData?.progress.currentQuestionIndex ?? 0
   const question = learningData?.questions[currentQuestionIndex] ?? null
+  const backUrl = courseId && sectionId
+    ? `/learn/courses/${courseId}/sections/${sectionId}`
+    : '/learn'
 
   // Sound effect for correct answer
   useEffect(() => {
@@ -89,7 +93,7 @@ export default function StartLessonPage() {
     }
   }, [checkResult])
 
-  async function handleStart() {
+  const handleStart = useCallback(async () => {
     if (!lessonId || isStarting) return
     if (initialLesson?.isLocked) {
       setStartError('Bạn cần hoàn thành bài học trước để mở bài học này.')
@@ -132,7 +136,14 @@ export default function StartLessonPage() {
     } finally {
       setIsStarting(false)
     }
-  }
+  }, [courseId, initialLesson, isStarting, lessonId, navigate, section, sectionId, updateCachedUser])
+
+  useEffect(() => {
+    if (!lessonId || startedLessonRef.current === lessonId || learningData) return
+
+    startedLessonRef.current = lessonId
+    void handleStart()
+  }, [handleStart, lessonId, learningData])
 
   async function handleCheck() {
     const submittedAnswer =
@@ -231,10 +242,6 @@ export default function StartLessonPage() {
   // Render: Quiz
   // ---------------------------------------------------------------------------
   if (learningData) {
-    const backUrl = courseId && sectionId 
-      ? `/learn/courses/${courseId}/sections/${sectionId}` 
-      : '/learn'
-
     return (
       <>
         <main className="lesson-quiz-page mx-auto flex min-h-[100dvh] w-full max-w-3xl flex-col px-4 py-8 pb-32 md:px-8" aria-live="polite">
@@ -331,31 +338,42 @@ export default function StartLessonPage() {
   }
 
   // ---------------------------------------------------------------------------
-  // Render: Start Screen
+  // Render: Preparing lesson / start error
   // ---------------------------------------------------------------------------
   return (
-    <main className="mx-auto w-full max-w-2xl px-4 py-8 md:px-8">
-      <section className="learning-surface learning-surface--raised rounded-2xl border-2 p-6 md:p-9">
-        <button type="button" onClick={() => navigate(-1)} className="learning-back-action mb-7 rounded-xl px-3 py-2 text-sm font-black focus-visible:outline-3 focus-visible:outline-offset-2 focus-visible:outline-sky-400">← Quay lại</button>
-        <p className="mb-2 text-xs font-black uppercase tracking-widest text-emerald-600">Bài học mới</p>
-        <h1 className="learning-heading-color mb-3 text-3xl font-black">{lesson?.name ?? 'Sẵn sàng bắt đầu?'}</h1>
-        <p className="learning-muted-color mb-7 text-sm leading-relaxed">{lesson?.description ?? 'Hãy sẵn sàng trả lời câu hỏi và chinh phục bài học này.'}</p>
-
-        <dl className="mb-8 grid grid-cols-2 gap-3">
-          <div className="lesson-start-stat lesson-start-stat--score rounded-xl p-4"><dt className="text-xs font-black uppercase tracking-wider">Cần đạt</dt><dd className="mt-1 text-2xl font-black">{lesson?.requiredScore ?? '—'}{lesson ? '%' : ''}</dd></div>
-          <div className="lesson-start-stat lesson-start-stat--questions rounded-xl p-4"><dt className="text-xs font-black uppercase tracking-wider">Câu hỏi</dt><dd className="mt-1 text-2xl font-black">{lesson?.questionCount ?? '—'}</dd></div>
-        </dl>
-
-        {startError && <div className="lesson-alert lesson-alert--error mb-5 rounded-xl p-4 text-sm font-bold" role="alert">{startError}</div>}
-        <button type="button" disabled={!lessonId || isStarting || initialLesson?.isLocked} onClick={() => void handleStart()} className="lesson-primary-action w-full rounded-xl bg-emerald-500 px-5 py-3.5 text-sm font-black uppercase tracking-wider text-white shadow-[0_4px_0_#047857] transition-all hover:bg-emerald-600 active:translate-y-1 active:shadow-none focus-visible:outline-3 focus-visible:outline-offset-2 focus-visible:outline-emerald-400">
-          {initialLesson?.isLocked
-            ? 'Bài học đang khóa'
-            : isStarting
-              ? 'Đang bắt đầu...'
-              : 'Bắt đầu học'}
-        </button>
-        {startError && <button type="button" onClick={() => void handleStart()} disabled={isStarting} className="lesson-retry-action mt-4 w-full text-sm font-black text-emerald-600 underline underline-offset-4">Thử lại</button>}
-      </section>
+    <main className="lesson-quiz-page mx-auto flex min-h-[100dvh] w-full max-w-3xl items-center justify-center px-4 py-8 pb-32 md:px-8">
+      {startError ? (
+        <section className="lesson-surface-card w-full max-w-xl rounded-2xl p-8 text-center" role="alert">
+          <h1 className="learning-heading-color text-xl font-black">
+            Không thể bắt đầu bài học
+          </h1>
+          <p className="learning-muted-color mt-3 text-sm">{startError}</p>
+          <div className="mt-6 flex flex-wrap justify-center gap-3">
+            <button
+              type="button"
+              onClick={() => void handleStart()}
+              disabled={isStarting || initialLesson?.isLocked}
+              className="lesson-primary-action rounded-xl bg-emerald-500 px-5 py-3 text-sm font-black uppercase tracking-wider text-white shadow-[0_4px_0_#047857] disabled:cursor-not-allowed"
+            >
+              Thử lại
+            </button>
+            <button
+              type="button"
+              onClick={() => navigate(backUrl)}
+              className="lesson-secondary-action rounded-xl border-2 px-5 py-3 text-sm font-black uppercase tracking-wider"
+            >
+              Quay lại
+            </button>
+          </div>
+        </section>
+      ) : (
+        <div className="learning-muted-color text-center" aria-busy="true">
+          <div className="lesson-loading-spinner mx-auto" aria-hidden="true" />
+          <p className="mt-4 text-sm font-black uppercase tracking-wider">
+            Đang chuẩn bị bài học...
+          </p>
+        </div>
+      )}
     </main>
   )
 }

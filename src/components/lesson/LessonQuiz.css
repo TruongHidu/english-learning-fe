@@ -32,6 +32,28 @@
   background: var(--surface-border);
 }
 
+.lesson-surface-card {
+  color: var(--heading-color);
+  background: var(--surface-bg);
+  border: 2px solid var(--surface-border);
+  box-shadow: 0 4px 0 var(--surface-shadow);
+}
+
+.lesson-loading-spinner {
+  width: 38px;
+  height: 38px;
+  border: 4px solid var(--surface-border);
+  border-top-color: var(--lesson-success);
+  border-radius: 50%;
+  animation: lesson-loading-spin 800ms linear infinite;
+}
+
+@keyframes lesson-loading-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
 .lesson-question-instruction {
   color: var(--heading-color);
 }

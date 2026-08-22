@@ -1,9 +1,13 @@
 import type { LearningPathLesson } from '../../types/learning-path.types'
+import LessonStartPopover from './LessonStartPopover'
 import './LessonPath.css'
 
 interface LessonPathProps {
   lessons: LearningPathLesson[]
   onSelectLesson: (lesson: LearningPathLesson) => void
+  selectedLessonId?: string | null
+  onStartLesson?: (lesson: LearningPathLesson) => void
+  onDismissLesson?: () => void
 }
 
 function getLessonStatusLabel(lesson: LearningPathLesson): string {
@@ -28,7 +32,13 @@ function LessonIcon({ lesson }: { lesson: LearningPathLesson }) {
   return <span aria-hidden="true">★</span>
 }
 
-export default function LessonPath({ lessons, onSelectLesson }: LessonPathProps) {
+export default function LessonPath({
+  lessons,
+  onSelectLesson,
+  selectedLessonId = null,
+  onStartLesson,
+  onDismissLesson,
+}: LessonPathProps) {
   if (lessons.length === 0) {
     return (
       <div className="learning-surface learning-surface--raised lesson-path-empty">
@@ -99,6 +109,16 @@ export default function LessonPath({ lessons, onSelectLesson }: LessonPathProps)
                 </span>
               )}
             </article>
+
+            {selectedLessonId === lesson.id && onStartLesson && onDismissLesson ? (
+              <LessonStartPopover
+                lesson={lesson}
+                lessonIndex={index}
+                totalLessons={lessons.length}
+                onStart={onStartLesson}
+                onDismiss={onDismissLesson}
+              />
+            ) : null}
           </li>
         )
       })}

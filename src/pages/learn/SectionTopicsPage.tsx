@@ -47,6 +47,7 @@ export default function SectionTopicsPage() {
   const [sectionPosition, setSectionPosition] = useState<number | null>(null)
   const [topicPaths, setTopicPaths] = useState<SectionTopicLearningPath[]>([])
   const [activeLessonId, setActiveLessonId] = useState<string | null>(null)
+  const [selectedLessonId, setSelectedLessonId] = useState<string | null>(null)
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const lessonPathRef = useRef<HTMLDivElement>(null)
@@ -74,6 +75,7 @@ export default function SectionTopicsPage() {
 
     setIsLoading(true)
     setError(null)
+    setSelectedLessonId(null)
 
     try {
       const sections = await courseService.getPublishedSections(courseId)
@@ -212,8 +214,17 @@ export default function SectionTopicsPage() {
     }
   }, [lessonScrollItems])
 
-  const openLesson = (lesson: LearningPathLesson) => {
+  const selectLesson = (lesson: LearningPathLesson) => {
+    if (lesson.isLocked) return
+    setSelectedLessonId((currentLessonId) =>
+      currentLessonId === lesson.id ? null : lesson.id,
+    )
+  }
+
+  const startLesson = (lesson: LearningPathLesson) => {
     if (lesson.isLocked || !courseId || !sectionId) return
+
+    setSelectedLessonId(null)
 
     navigate(`/learn/lessons/${lesson.id}/start`, {
       state: {
@@ -250,7 +261,7 @@ export default function SectionTopicsPage() {
           <button
             type="button"
             disabled={activeLessonItem.lesson.isLocked}
-            onClick={() => openLesson(activeLessonItem.lesson)}
+            onClick={() => selectLesson(activeLessonItem.lesson)}
           >
             <span aria-hidden="true">
               {activeLessonItem.lesson.isLocked ? '🔒' : '▶'}
@@ -348,7 +359,13 @@ export default function SectionTopicsPage() {
                 <span className="h-0.5 flex-1 bg-[var(--surface-border)]" aria-hidden="true" />
               </div>
 
-              <LessonPath lessons={lessons} onSelectLesson={openLesson} />
+              <LessonPath
+                lessons={lessons}
+                onSelectLesson={selectLesson}
+                selectedLessonId={selectedLessonId}
+                onStartLesson={startLesson}
+                onDismissLesson={() => setSelectedLessonId(null)}
+              />
             </section>
           ))}
         </div>
