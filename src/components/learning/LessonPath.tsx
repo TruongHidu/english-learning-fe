@@ -8,6 +8,7 @@ interface LessonPathProps {
   selectedLessonId?: string | null
   onStartLesson?: (lesson: LearningPathLesson) => void
   onDismissLesson?: () => void
+  onViewVocab?: (lesson: LearningPathLesson) => void
 }
 
 function getLessonStatusLabel(lesson: LearningPathLesson): string {
@@ -38,6 +39,7 @@ export default function LessonPath({
   selectedLessonId = null,
   onStartLesson,
   onDismissLesson,
+  onViewVocab,
 }: LessonPathProps) {
   if (lessons.length === 0) {
     return (
@@ -117,6 +119,7 @@ export default function LessonPath({
                 totalLessons={lessons.length}
                 onStart={onStartLesson}
                 onDismiss={onDismissLesson}
+                onViewVocab={onViewVocab}
               />
             ) : null}
           </li>

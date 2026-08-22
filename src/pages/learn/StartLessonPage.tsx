@@ -2,7 +2,7 @@ import { useState, useEffect, useRef, useCallback } from 'react'
 import { useLocation, useNavigate, useParams } from 'react-router-dom'
 import { normalizeApiError } from '../../api/api-error'
 import { learningService } from '../../services/learning.service'
-import type { StartLessonData, SubmitAnswerResult } from '../../types/learning.types'
+import type { LessonCompletionRewards, StartLessonData, SubmitAnswerResult } from '../../types/learning.types'
 import type { UserCourseSectionResponse } from '../../types/course.types'
 import type { LearningPathLesson } from '../../types/learning-path.types'
 import { getStartLessonErrorMessage } from '../../utils/learning-errors'
@@ -49,6 +49,7 @@ export default function StartLessonPage() {
   const [isGameOver, setIsGameOver] = useState(false)
   const [isComplete, setIsComplete] = useState(false)
   const [isExitConfirmOpen, setIsExitConfirmOpen] = useState(false)
+  const [completionRewards, setCompletionRewards] = useState<LessonCompletionRewards | null>(null)
 
   // Use a ref for AudioContext to avoid creating it multiple times
   const audioCtxRef = useRef<AudioContext | null>(null)
@@ -164,23 +165,38 @@ export default function StartLessonPage() {
         answer: submittedAnswer,
       })
 
-      updateCachedUser({
-        stats: {
-          currentHeart: result.heartsRemaining,
-          nextHeartAt: result.nextHeartAt,
-        },
-      })
-
       setCheckResult(result)
       
-      // Update local state with API results (from SubmitAnswerResult)
+      // Save rewards if session is completed
+      if (result.sessionStatus === 'COMPLETED' && result.rewards) {
+        setCompletionRewards(result.rewards)
+        updateCachedUser({
+          stats: {
+            currentHeart: result.heartsRemaining,
+            nextHeartAt: result.nextHeartAt,
+            totalXp: result.rewards.totalXp,
+            level: result.rewards.level,
+            currentStreak: result.rewards.currentStreak,
+            longestStreak: result.rewards.longestStreak,
+          },
+        })
+      } else {
+        updateCachedUser({
+          stats: {
+            currentHeart: result.heartsRemaining,
+            nextHeartAt: result.nextHeartAt,
+          },
+        })
+      }
+
+      // Update local state with API results
       setLearningData(prev => {
         if (!prev) return prev
         return {
           ...prev,
           hearts: {
             ...prev.hearts,
-            current: result.heartsRemaining, // Updated from API
+            current: result.heartsRemaining,
             nextHeartAt: result.nextHeartAt,
           },
           session: {
@@ -198,6 +214,7 @@ export default function StartLessonPage() {
     } finally {
       setIsSubmitting(false)
     }
+
   }
 
   function handleContinue() {
@@ -240,7 +257,12 @@ export default function StartLessonPage() {
   // Render: Complete
   // ---------------------------------------------------------------------------
   if (isComplete && learningData) {
-    return <LessonComplete session={learningData.session} courseId={courseId} sectionId={sectionId} />
+    return <LessonComplete
+      session={learningData.session}
+      courseId={courseId}
+      sectionId={sectionId}
+      rewards={completionRewards}
+    />
   }
 
   // ---------------------------------------------------------------------------

@@ -29,6 +29,7 @@ import StartLessonPage from '../pages/learn/StartLessonPage'
 import SectionTopicsPage from '../pages/learn/SectionTopicsPage'
 import TopicLearningPathPage from '../pages/learn/TopicLearningPathPage'
 import ProfilePage from '../pages/profile/ProfilePage'
+import LearnedVocabularyPage from '../pages/vocabulary/LearnedVocabularyPage'
 
 function DashboardRedirect() {
   const { user } = useAuth()
@@ -62,6 +63,7 @@ function AppRoutes() {
           }
         >
           <Route path="/learn" element={<LearnPage />} />
+          <Route path="/vocabulary" element={<LearnedVocabularyPage />} />
           <Route path="/learn/courses/:courseId" element={<CourseSectionsPage />} />
           <Route path="/learn/courses/:courseId/sections/:sectionId" element={<SectionTopicsPage />} />
           <Route path="/learn/topics/:topicId" element={<TopicLearningPathPage />} />

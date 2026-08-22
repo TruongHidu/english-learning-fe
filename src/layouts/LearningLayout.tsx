@@ -4,6 +4,7 @@ import MoreMenu from '../components/navigation/MoreMenu'
 import SidebarIcon from '../components/navigation/SidebarIcon'
 import type { SidebarIconName } from '../components/navigation/SidebarIcon'
 import { useAuth } from '../hooks/useAuth'
+import { getLevelInfo } from '../utils/level-calculator'
 import './LearningLayout.css'
 
 interface NavigationItem {
@@ -38,10 +39,21 @@ function GemIcon() {
   )
 }
 
+function XpIcon() {
+  return (
+    <svg viewBox="0 0 24 24" aria-hidden="true" fill="currentColor">
+      <path d="M13 2L3 14h7v8l10-12h-7V2z" />
+    </svg>
+  )
+}
+
 export default function LearningLayout() {
   const { logout, user } = useAuth()
   const location = useLocation()
   const isLessonRoute = location.pathname.startsWith('/learn/lessons/')
+
+  const totalXp = user?.stats.totalXp ?? 0
+  const levelInfo = getLevelInfo(totalXp)
 
   return (
     <div className={`learning-shell${isLessonRoute ? ' learning-shell--lesson' : ''}`}>
@@ -73,6 +85,16 @@ export default function LearningLayout() {
             <div className="stat-item stat-item--language" title="Khóa học Tiếng Anh">
               <span className="language-flag" aria-hidden="true">🇺🇸</span>
               <span className="stat-label">TIẾNG ANH</span>
+            </div>
+            <div
+              className="stat-item stat-item--level"
+              title={`Cấp độ ${levelInfo.level} • ${levelInfo.xpInCurrentLevel}/${levelInfo.xpRequiredForLevel} XP để lên Cấp ${levelInfo.level + 1}`}
+            >
+              <XpIcon />
+              <div className="stat-level-info">
+                <strong className="stat-level-num">Lv. {levelInfo.level}</strong>
+                <span className="stat-level-xp">{levelInfo.xpInCurrentLevel}/{levelInfo.xpRequiredForLevel} XP</span>
+              </div>
             </div>
             <div className="stat-item stat-item--streak" title="Chuỗi ngày học">
               <FlameIcon />

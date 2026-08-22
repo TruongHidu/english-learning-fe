@@ -473,3 +473,39 @@
     font-size: 16px;
   }
 }
+
+/* ====================== LessonComplete ====================== */
+.lesson-complete-page {
+  animation: lesson-complete-in 0.5s ease-out;
+}
+
+@keyframes lesson-complete-in {
+  from {
+    opacity: 0;
+    transform: translateY(16px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.lesson-bounce-anim {
+  animation: lesson-trophy-bounce 0.8s cubic-bezier(0.36, 0.07, 0.19, 0.97) both;
+}
+
+@keyframes lesson-trophy-bounce {
+  0%, 100% {
+    transform: translateY(0) scale(1);
+  }
+
+  30% {
+    transform: translateY(-18px) scale(1.08);
+  }
+
+  60% {
+    transform: translateY(-8px) scale(1.03);
+  }
+}
+

@@ -10,7 +10,9 @@ export interface UserStats {
   totalXp: number
   level: number
   currentStreak: number
+  longestStreak?: number
 }
+
 
 export interface AuthUser {
   id: string

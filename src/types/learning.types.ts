@@ -61,6 +61,17 @@ export interface SubmitAnswerPayload {
   answer: string | string[]
 }
 
+export interface LessonCompletionRewards {
+  xpEarned: number
+  diamondEarned: number
+  totalXp: number
+  level: number
+  currentStreak: number
+  longestStreak: number
+  learnedVocabularyIds: string[]
+  isNextLessonUnlocked: boolean
+}
+
 export interface SubmitAnswerResult {
   isCorrect: boolean
   correctAnswer?: unknown
@@ -70,6 +81,9 @@ export interface SubmitAnswerResult {
   sessionStatus: 'IN_PROGRESS' | 'COMPLETED' | 'FAILED' | 'ABANDONED'
   correctCount: number
   wrongCount: number
+  score: number
+  rewards?: LessonCompletionRewards | null
 }
 
 export type SubmitAnswerResponse = ApiSuccess<SubmitAnswerResult>
+
