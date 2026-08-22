@@ -109,6 +109,7 @@ export default function StartLessonPage() {
         stats: {
           currentHeart: nextLearningData.hearts.current,
           maxHeart: nextLearningData.hearts.max,
+          nextHeartAt: nextLearningData.hearts.nextHeartAt,
         },
       })
       // Reset quiz state
@@ -164,7 +165,10 @@ export default function StartLessonPage() {
       })
 
       updateCachedUser({
-        stats: { currentHeart: result.heartsRemaining },
+        stats: {
+          currentHeart: result.heartsRemaining,
+          nextHeartAt: result.nextHeartAt,
+        },
       })
 
       setCheckResult(result)
@@ -177,6 +181,7 @@ export default function StartLessonPage() {
           hearts: {
             ...prev.hearts,
             current: result.heartsRemaining, // Updated from API
+            nextHeartAt: result.nextHeartAt,
           },
           session: {
             ...prev.session,

@@ -5,6 +5,7 @@ export type AuthProvider = 'LOCAL' | 'GOOGLE'
 export interface UserProfileStats {
   currentHeart: number
   maxHeart: number
+  nextHeartAt?: string | null
   diamond: number
   totalXp: number
   level: number

@@ -1,9 +1,12 @@
 import { useEffect, useRef, useState } from 'react'
 import type { FocusEvent } from 'react'
+import { useAuth } from '../../hooks/useAuth'
+import { userService } from '../../services/user.service'
 
 interface HeartMenuProps {
   currentHeart: number
   maxHeart: number
+  nextHeartAt?: string | null
 }
 
 function HeartIcon({ filled = true }: { filled?: boolean }) {
@@ -42,10 +45,14 @@ function SmallGemIcon() {
   )
 }
 
-export default function HeartMenu({ currentHeart, maxHeart }: HeartMenuProps) {
+export default function HeartMenu({ currentHeart, maxHeart, nextHeartAt }: HeartMenuProps) {
   const containerRef = useRef<HTMLDivElement>(null)
+  const { updateCachedUser } = useAuth()
   const [isOpen, setIsOpen] = useState(false)
   const [isPinned, setIsPinned] = useState(false)
+  const [now, setNow] = useState(() => Date.now())
+  const isSyncingRef = useRef(false)
+
   const safeMaxHeart = Math.max(0, Math.min(Math.trunc(maxHeart), 20))
   const safeCurrentHeart = Math.max(0, Math.min(Math.trunc(currentHeart), safeMaxHeart))
   const isFull = safeMaxHeart > 0 && safeCurrentHeart >= safeMaxHeart
@@ -73,6 +80,39 @@ export default function HeartMenu({ currentHeart, maxHeart }: HeartMenuProps) {
     }
   }, [])
 
+  // Timer interval to tick every second when missing hearts
+  useEffect(() => {
+    if (isFull || !nextHeartAt) return
+
+    setNow(Date.now())
+    const interval = setInterval(() => {
+      setNow(Date.now())
+    }, 1000)
+
+    return () => clearInterval(interval)
+  }, [isFull, nextHeartAt])
+
+  const targetMs = nextHeartAt ? new Date(nextHeartAt).getTime() : null
+  const remainingMs = targetMs ? Math.max(0, targetMs - now) : 0
+
+  // When timer reaches 00:00, sync with backend
+  useEffect(() => {
+    if (isFull || !nextHeartAt || remainingMs > 0 || isSyncingRef.current) return
+
+    isSyncingRef.current = true
+    userService
+      .getProfile()
+      .then((profile) => {
+        updateCachedUser({ stats: profile.stats })
+      })
+      .catch((err) => {
+        console.error('Failed to sync hearts:', err)
+      })
+      .finally(() => {
+        isSyncingRef.current = false
+      })
+  }, [isFull, nextHeartAt, remainingMs, updateCachedUser])
+
   function handleMouseEnter() {
     if (!isPinned) setIsOpen(true)
   }
@@ -98,12 +138,19 @@ export default function HeartMenu({ currentHeart, maxHeart }: HeartMenuProps) {
     setIsOpen(true)
   }
 
+  const minutes = Math.floor(remainingMs / 60000)
+  const seconds = Math.floor((remainingMs % 60000) / 1000)
+  const formattedCountdown = `${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`
+
   const statusTitle = isFull
     ? 'Bạn có đầy đủ trái tim'
     : isEmpty
       ? 'Bạn đã hết trái tim'
-      : `Bạn còn ${safeCurrentHeart} trái tim`
-  const statusDescription = isEmpty ? 'Hồi phục để tiếp tục học' : 'Tiếp tục học'
+      : `Bạn còn ${safeCurrentHeart} / ${safeMaxHeart} trái tim`
+
+  const statusDescription = isFull
+    ? 'Tiếp tục học'
+    : `Tim tiếp theo sau ${formattedCountdown}`
 
   return (
     <div

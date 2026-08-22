@@ -85,6 +85,7 @@ export default function LearningLayout() {
             <HeartMenu
               currentHeart={user?.stats.currentHeart ?? 0}
               maxHeart={user?.stats.maxHeart ?? 0}
+              nextHeartAt={user?.stats.nextHeartAt ?? null}
             />
           </div>
         </header>

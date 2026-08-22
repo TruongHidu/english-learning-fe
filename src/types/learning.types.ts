@@ -49,6 +49,7 @@ export interface StartLessonData {
   hearts: {
     current: number
     max: number
+    nextHeartAt?: string | null
   }
   questions: LearningQuestion[]
 }
@@ -65,6 +66,7 @@ export interface SubmitAnswerResult {
   correctAnswer?: unknown
   explanation?: string | null
   heartsRemaining: number
+  nextHeartAt?: string | null
   sessionStatus: 'IN_PROGRESS' | 'COMPLETED' | 'FAILED' | 'ABANDONED'
   correctCount: number
   wrongCount: number

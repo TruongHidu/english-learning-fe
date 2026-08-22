@@ -5,6 +5,7 @@ export type UserStatus = 'ACTIVE' | 'LOCKED' | 'BANNED'
 export interface UserStats {
   currentHeart: number
   maxHeart: number
+  nextHeartAt?: string | null
   diamond: number
   totalXp: number
   level: number
