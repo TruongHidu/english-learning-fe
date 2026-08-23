@@ -1,4 +1,5 @@
-import { NavLink, Outlet, useLocation } from 'react-router-dom'
+import React, { useState } from 'react'
+import { Link, Navigate, NavLink, Outlet, useLocation } from 'react-router-dom'
 import HeartMenu from '../components/navigation/HeartMenu'
 import MoreMenu from '../components/navigation/MoreMenu'
 import SidebarIcon from '../components/navigation/SidebarIcon'
@@ -11,10 +12,16 @@ interface NavigationItem {
   to: string
   label: string
   icon: SidebarIconName
+  subItems?: { to: string; label: string }[]
 }
 
 const baseNavigationItems: NavigationItem[] = [
-  { to: '/learn', label: 'HỌC', icon: 'learn' },
+  {
+    to: '/learn',
+    label: 'HỌC',
+    icon: 'learn',
+    subItems: [{ to: '/vocabularies/learned', label: 'Từ vựng đã học' }],
+  },
   { to: '/pronunciation', label: 'PHÁT ÂM', icon: 'pronunciation' },
   { to: '/leaderboard', label: 'BẢNG XẾP HẠNG', icon: 'leaderboard' },
   { to: '/quests', label: 'NHIỆM VỤ', icon: 'quests' },
@@ -50,10 +57,31 @@ function XpIcon() {
 export default function LearningLayout() {
   const { logout, user } = useAuth()
   const location = useLocation()
+  const isLearnActive = location.pathname.startsWith('/learn') || location.pathname.startsWith('/vocabularies/learned')
+
+  // Initialize expandedNav based on current route
+  const [expandedNav, setExpandedNav] = useState<string | null>(() => {
+    if (location.pathname.startsWith('/vocabularies/learned')) return '/learn'
+    return null
+  })
+  
   const isLessonRoute = location.pathname.startsWith('/learn/lessons/')
 
   const totalXp = user?.stats.totalXp ?? 0
   const levelInfo = getLevelInfo(totalXp)
+
+  const toggleNav = (to: string, e: React.MouseEvent) => {
+    const item = baseNavigationItems.find(i => i.to === to)
+    if (item?.subItems) {
+      // Don't prevent default, allow navigation to /learn, but toggle dropdown
+      setExpandedNav(expandedNav === to ? null : to)
+    }
+  }
+
+  const checkIsActive = (to: string) => {
+    if (to === '/learn') return isLearnActive
+    return location.pathname.startsWith(to)
+  }
 
   return (
     <div className={`learning-shell${isLessonRoute ? ' learning-shell--lesson' : ''}`}>
@@ -64,16 +92,37 @@ export default function LearningLayout() {
 
         <nav className="sidebar-nav" aria-label="Điều hướng chính">
           {baseNavigationItems.map((item) => (
-            <NavLink
-              key={item.to}
-              className={({ isActive }) => `sidebar-link${isActive ? ' sidebar-link--active' : ''}`}
-              to={item.to}
-            >
-              <span className={`sidebar-icon sidebar-icon--${item.icon}`}>
-                <SidebarIcon name={item.icon} />
-              </span>
-              <span>{item.label}</span>
-            </NavLink>
+            <div key={item.to} className="relative flex flex-col">
+              <NavLink
+                onClick={(e) => toggleNav(item.to, e)}
+                className={() => `sidebar-link${checkIsActive(item.to) ? ' sidebar-link--active' : ''}`}
+                to={item.to}
+              >
+                <span className={`sidebar-icon sidebar-icon--${item.icon}`}>
+                  <SidebarIcon name={item.icon} />
+                </span>
+                <span>{item.label}</span>
+              </NavLink>
+              
+              {item.subItems && expandedNav === item.to && (
+                <div className="flex flex-col ml-[20px] mt-2 mb-2 gap-2 transition-all">
+                  {item.subItems.map((subItem) => (
+                    <NavLink
+                      key={subItem.to}
+                      to={subItem.to}
+                      className={({ isActive }) => `sidebar-link${isActive ? ' sidebar-link--active' : ''}`}
+                      style={{ minHeight: '52px', padding: '8px 16px' }}
+                    >
+                       {/* A small dot or book icon for sub-item */}
+                       <span className="sidebar-icon" style={{ width: 32, height: 32, flex: '0 0 32px' }}>
+                          <svg viewBox="0 0 24 24" width="24" height="24" className="icon-outline"><path d="M4 19.5v-15A2.5 2.5 0 0 1 6.5 2H20v20H6.5a2.5 2.5 0 0 1 0-5H20" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/></svg>
+                       </span>
+                       <span style={{ fontSize: '14px' }}>{subItem.label}</span>
+                    </NavLink>
+                  ))}
+                </div>
+              )}
+            </div>
           ))}
           <MoreMenu onLogout={logout} />
         </nav>

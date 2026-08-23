@@ -337,9 +337,12 @@ export default function StartLessonPage() {
           <CheckFooter
             state={footerState}
             isDisabled={
-              typeof selectedAnswer === 'string'
-                ? selectedAnswer.trim().length === 0
-                : !selectedAnswer
+              !!(!selectedAnswer || 
+              (typeof selectedAnswer === 'string' && selectedAnswer.trim().length === 0) ||
+              (Array.isArray(selectedAnswer) && (
+                selectedAnswer.length === 0 || 
+                (question?.type === 'MATCHING' && question.matchingLeftItems && selectedAnswer.length !== question.matchingLeftItems.length)
+              )))
             }
             correctAnswer={typeof checkResult?.correctAnswer === 'string' ? checkResult.correctAnswer : Array.isArray(checkResult?.correctAnswer) ? checkResult.correctAnswer.join(', ') : undefined}
             explanation={checkResult?.explanation}
