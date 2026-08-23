@@ -13,6 +13,7 @@ export interface LearnedVocabulary {
 export interface ReviewDueQuery {
   topicId?: string
   limit?: number
+  forceAll?: boolean
 }
 
 export type ReviewDueResponse = ApiSuccess<{

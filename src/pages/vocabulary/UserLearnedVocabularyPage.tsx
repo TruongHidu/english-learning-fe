@@ -6,6 +6,7 @@ export default function UserLearnedVocabularyPage() {
   const { items, isLoading, refetch } = useLearnedVocabularies()
   const { stats, refetch: refetchStats } = useReviewStats()
   const [isReviewMode, setIsReviewMode] = useState(false)
+  const [isForceAll, setIsForceAll] = useState(false)
 
   const handleSpeak = (text: string, audioUrl?: string | null) => {
     if (audioUrl) {
@@ -115,14 +116,22 @@ export default function UserLearnedVocabularyPage() {
           
           {stats.dueToday > 0 ? (
             <button
-              onClick={() => setIsReviewMode(true)}
+              onClick={() => { setIsForceAll(false); setIsReviewMode(true) }}
               className="w-full py-4 bg-sky-500 text-white rounded-2xl font-black uppercase tracking-wider text-sm hover:bg-sky-400 active:scale-[0.98] transition-all shadow-[0_4px_0_#0284c7] active:shadow-none active:translate-y-1"
             >
               Bắt Đầu Ôn Tập
             </button>
           ) : (
-            <div className="w-full py-4 bg-[#2d313a] text-gray-400 rounded-2xl font-black text-sm uppercase tracking-wider text-center border-2 border-[#373b45]">
-              Đã hoàn thành
+            <div className="flex flex-col gap-3">
+              <div className="w-full py-4 bg-[#2d313a] text-emerald-400 rounded-2xl font-black text-sm uppercase tracking-wider text-center border-2 border-[#373b45]">
+                Đã hoàn thành hôm nay
+              </div>
+              <button
+                onClick={() => { setIsForceAll(true); setIsReviewMode(true) }}
+                className="w-full py-4 bg-sky-500 text-white rounded-2xl font-black uppercase tracking-wider text-sm hover:bg-sky-400 active:scale-[0.98] transition-all shadow-[0_4px_0_#0284c7] active:shadow-none active:translate-y-1"
+              >
+                Ôn Tập Lại Tất Cả
+              </button>
             </div>
           )}
         </article>
@@ -131,8 +140,10 @@ export default function UserLearnedVocabularyPage() {
       {/* Review Modal */}
       {isReviewMode && (
         <ReviewModal 
+          forceAll={isForceAll}
           onClose={() => {
             setIsReviewMode(false)
+            setIsForceAll(false)
             refetchStats()
             refetch()
           }} 
@@ -142,8 +153,8 @@ export default function UserLearnedVocabularyPage() {
   )
 }
 
-function ReviewModal({ onClose }: { onClose: () => void }) {
-  const { items, isLoading, error } = useReviewSession({ limit: 15 })
+function ReviewModal({ onClose, forceAll = false }: { onClose: () => void; forceAll?: boolean }) {
+  const { items, isLoading, error } = useReviewSession({ limit: 15, forceAll })
   const { submit, isLoading: isSubmitting } = useSubmitReviewResults()
   
   const [currentIndex, setCurrentIndex] = useState(0)

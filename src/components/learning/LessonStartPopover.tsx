@@ -41,7 +41,7 @@ export default function LessonStartPopover({
           </p>
           <div className="flex flex-col gap-2 w-full">
             <button type="button" onClick={() => onStart(lesson)}>
-              {lesson.isCompleted ? 'Học lại' : 'Bắt đầu'} +{lesson.xpReward} KN
+              {lesson.isCompleted ? 'Học lại' : `Bắt đầu +${lesson.xpReward} KN`}
             </button>
             {onViewVocab && (
               <button
