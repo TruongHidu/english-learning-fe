@@ -12,6 +12,7 @@ import AdminDashboardPage from '../pages/admin/AdminDashboardPage'
 import AdminSectionListPage from '../pages/admin/AdminSectionListPage'
 import AdminSectionTopicsPage from '../pages/admin/AdminSectionTopicsPage'
 import AdminAIContentPage from '../pages/admin/AdminAIContentPage'
+import AdminAiQuestionWorkflowPage from '../pages/admin/AdminAiQuestionWorkflowPage'
 import AdminDiamondPackagePage from '../pages/admin/AdminDiamondPackagePage'
 import AdminLessonDetailPage from '../pages/admin/AdminLessonDetailPage'
 import AdminPaymentListPage from '../pages/admin/AdminPaymentListPage'
@@ -108,6 +109,7 @@ function AppRoutes() {
           <Route path="lessons/:lessonId" element={<AdminLessonDetailPage />} />
           <Route path="questions" element={<AdminQuestionListPage />} />
           <Route path="ai-content" element={<AdminAIContentPage />} />
+          <Route path="ai-workflow" element={<AdminAiQuestionWorkflowPage />} />
           <Route path="users" element={<AdminUserListPage />} />
           <Route path="users/:userId" element={<AdminUserDetailPage />} />
           <Route path="payments" element={<AdminPaymentListPage />} />

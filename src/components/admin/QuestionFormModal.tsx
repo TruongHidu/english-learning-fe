@@ -358,6 +358,13 @@ export default function QuestionFormModal({
           isCorrect: o.content.trim().toLowerCase() === correctAnswerText.trim().toLowerCase(),
           orderIndex: idx + 1,
         }))
+      } else if (type === 'ORDER_SENTENCE') {
+        const words = correctAnswerText.trim().split(/\s+/).filter(Boolean)
+        payload.options = words.map((word, idx) => ({
+          content: word,
+          isCorrect: true,
+          orderIndex: idx + 1,
+        }))
       }
     }
 
@@ -489,7 +496,7 @@ export default function QuestionFormModal({
                 type === 'FILL_BLANK'
                   ? 'VD: She is an ___ girl. (Dùng 3 dấu ___ đại diện cho vị trí điền)'
                   : type === 'ORDER_SENTENCE'
-                    ? 'VD: Dịch câu: Tôi đi học mỗi ngày bằng xe đạp'
+                    ? 'VD: Sắp xếp các từ thành câu hoàn chỉnh:'
                     : type === 'TRANSLATION'
                       ? 'VD: She likes reading books'
                       : 'VD: Chọn đáp án có nghĩa đúng'
@@ -796,47 +803,21 @@ export default function QuestionFormModal({
                 />
               </div>
 
-              {type === 'FILL_BLANK' || type === 'ORDER_SENTENCE' ? (
-                <div className="p-4 bg-slate-50 border border-slate-200 rounded-xl space-y-3">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <label className="block text-xs font-extrabold text-slate-700">
-                        Các từ gợi ý / từ nhiễu bổ sung (Word Bank Chips)
-                      </label>
-                    </div>
-                    <button
-                      type="button"
-                      className="text-xs font-bold text-emerald-600 hover:text-emerald-700"
-                      onClick={addOption}
-                    >
-                      + Thêm từ gợi ý
-                    </button>
-                  </div>
-
-                  {options.map((opt, idx) => (
-                    <div key={idx} className="flex items-center gap-3">
-                      <input
-                        className="admin-field flex-1"
-                        placeholder={`Từ gợi ý #${idx + 1}`}
-                        value={opt.content}
-                        onChange={(e) => {
-                          const val = e.target.value
-                          setOptions((prev) =>
-                            prev.map((o, i) =>
-                              i === idx ? { ...o, content: val } : o,
-                            ),
-                          )
-                        }}
-                      />
-                      <button
-                        type="button"
-                        className="text-rose-500 hover:text-rose-700 font-bold px-2"
-                        onClick={() => removeOption(idx)}
+              {type === 'ORDER_SENTENCE' && correctAnswerText.trim() ? (
+                <div className="p-4 bg-emerald-50/70 border border-emerald-200 rounded-xl space-y-2">
+                  <label className="block text-xs font-extrabold text-emerald-900">
+                    🧩 Xem trước các thẻ từ được tách tự động ({correctAnswerText.trim().split(/\s+/).length} thẻ từ):
+                  </label>
+                  <div className="flex flex-wrap gap-2 pt-1">
+                    {correctAnswerText.trim().split(/\s+/).map((w, idx) => (
+                      <span
+                        key={idx}
+                        className="px-3 py-1.5 bg-emerald-600 text-white font-black text-xs rounded-xl shadow-xs"
                       >
-                        ×
-                      </button>
-                    </div>
-                  ))}
+                        {w}
+                      </span>
+                    ))}
+                  </div>
                 </div>
               ) : null}
             </div>

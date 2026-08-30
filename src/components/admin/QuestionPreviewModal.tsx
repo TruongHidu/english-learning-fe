@@ -64,15 +64,13 @@ export default function QuestionPreviewModal({
       setShuffledRightPairs([])
     }
 
-    // 3. Khởi tạo chips cho ORDER_SENTENCE & FILL_BLANK
+    // 3. Khởi tạo chips cho ORDER_SENTENCE
     if (question.type === 'ORDER_SENTENCE') {
       const correctStr = String(question.correctAnswer ?? '')
       const correctWords = correctStr.split(/\s+/).filter(Boolean)
       const extraChips = question.options?.map((o) => o.content) ?? []
       const allChips = [...correctWords, ...extraChips]
       setAvailableChips(allChips.sort(() => Math.random() - 0.5))
-    } else if (question.type === 'FILL_BLANK' && question.options && question.options.length > 0) {
-      setAvailableChips(question.options.map((o) => o.content).sort(() => Math.random() - 0.5))
     }
   }, [isOpen, question])
 
@@ -403,25 +401,6 @@ export default function QuestionPreviewModal({
                 disabled={isSubmitted}
                 onChange={(e) => setTextAnswer(e.target.value)}
               />
-
-              {question.type === 'FILL_BLANK' && availableChips.length > 0 ? (
-                <div className="flex flex-wrap gap-2 pt-1">
-                  <span className="text-xs font-bold text-slate-400 self-center mr-1">
-                    Gợi ý từ:
-                  </span>
-                  {availableChips.map((chip, idx) => (
-                    <button
-                      key={idx}
-                      type="button"
-                      disabled={isSubmitted}
-                      onClick={() => setTextAnswer(chip)}
-                      className="px-3 py-1.5 bg-slate-100 hover:bg-emerald-100 hover:text-emerald-800 text-slate-700 font-bold text-xs rounded-xl border border-slate-200 transition-colors"
-                    >
-                      {chip}
-                    </button>
-                  ))}
-                </div>
-              ) : null}
             </div>
           ) : null}
         </div>

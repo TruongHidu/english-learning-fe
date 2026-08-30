@@ -74,12 +74,12 @@ export const adminQuestionService = {
 
   async updateQuestion(
     questionId: string,
-    formData: FormData,
+    payload: FormData | Record<string, any>,
     onProgress?: QuestionUploadProgressHandler,
   ): Promise<QuestionResponse> {
     const response = await api.patch<GetAdminQuestionDetailResponse>(
       `/admin/questions/${questionId}`,
-      formData,
+      payload,
       getUploadConfig(onProgress),
     )
     onProgress?.(100)

@@ -331,99 +331,146 @@ export default function AdminQuestionListPage() {
           }
         />
       ) : (
-        <DataTable
-          headers={[
-            'Câu hỏi',
-            'Từ vựng liên kết',
-            'Loại',
-            'Độ khó',
-            'Trạng thái',
-            'Thao tác',
-          ]}
-          caption="Danh sách câu hỏi"
-        >
-          {questions.map((q) => (
-            <tr key={q.id}>
-              <td className="admin-table__primary">
-                <strong>{q.content}</strong>
-              </td>
-              <td>
-                {q.vocabularies && q.vocabularies.length > 0 ? (
-                  <div className="flex flex-wrap gap-1">
-                    {q.vocabularies.map((v) => (
-                      <span
-                        key={v.id}
-                        className="inline-flex items-center gap-1 text-[11px] font-extrabold px-2 py-0.5 bg-emerald-50 text-emerald-800 border border-emerald-200 rounded-lg"
-                      >
-                        🔤 {v.word}
-                      </span>
-                    ))}
-                  </div>
-                ) : (
-                  <span className="text-slate-400 text-xs font-semibold">— (Tổng hợp)</span>
-                )}
-              </td>
+        <>
+          <DataTable
+            headers={[
+              'Câu hỏi',
+              'Từ vựng liên kết',
+              'Loại',
+              'Độ khó',
+              'Trạng thái',
+              'Thao tác',
+            ]}
+            caption="Danh sách câu hỏi"
+          >
+            {questions.map((q) => (
+              <tr key={q.id}>
+                <td className="admin-table__primary">
+                  <strong>{q.content}</strong>
+                </td>
+                <td>
+                  {q.vocabularies && q.vocabularies.length > 0 ? (
+                    <div className="flex flex-wrap gap-1">
+                      {q.vocabularies.map((v) => (
+                        <span
+                          key={v.id}
+                          className="inline-flex items-center gap-1 text-[11px] font-extrabold px-2 py-0.5 bg-emerald-50 text-emerald-800 border border-emerald-200 rounded-lg"
+                        >
+                          🔤 {v.word}
+                        </span>
+                      ))}
+                    </div>
+                  ) : (
+                    <span className="text-slate-400 text-xs font-semibold">— (Tổng hợp)</span>
+                  )}
+                </td>
 
-              <td>
-                <span className="text-xs font-semibold px-2 py-1 bg-slate-100 rounded">
-                  {q.type}
-                </span>
-              </td>
-              <td>
-                <span className="font-bold text-xs">
-                  {q.difficulty === 'EASY'
-                    ? 'Dễ'
-                    : q.difficulty === 'MEDIUM'
-                      ? 'Vừa'
-                      : 'Khó'}
-                </span>
-              </td>
-              <td>
-                <StatusBadge status={q.status} />
-              </td>
-              <td>
-                <span className="admin-actions">
-                  <button
-                    type="button"
-                    className="admin-button admin-button--secondary admin-button--small"
-                    onClick={() => void openPreview(q)}
-                  >
-                    👀 Xem trước
-                  </button>
-                  <button
-                    type="button"
-                    className="admin-button admin-button--secondary admin-button--small"
-                    onClick={() => void openEdit(q)}
-                  >
-                    Chỉnh sửa
-                  </button>
-                  <select
-                    className="admin-select admin-select--small"
-                    value={q.status}
-                    disabled={isMutating}
-                    onChange={(e) =>
-                      void handleStatusChange(
-                        q,
-                        e.target.value as QuestionStatus,
-                      )
-                    }
-                  >
-                    <option value="DRAFT">Bản nháp</option>
-                    <option value="PUBLISHED">Xuất bản</option>
-                    <option value="INACTIVE">Ngừng dùng</option>
-                  </select>
-                  <button
-                    type="button"
-                    className="admin-button admin-button--danger admin-button--small"
-                    onClick={() => setQuestionToDelete(q)}
-                  >
-                    Xóa
-                  </button>
-                </span>
-              </td>
-            </tr>
-          ))}
-        </DataTable>
+                <td>
+                  <span className="text-xs font-semibold px-2 py-1 bg-slate-100 rounded">
+                    {q.type}
+                  </span>
+                </td>
+                <td>
+                  <span className="font-bold text-xs">
+                    {q.difficulty === 'EASY'
+                      ? 'Dễ'
+                      : q.difficulty === 'MEDIUM'
+                        ? 'Vừa'
+                        : 'Khó'}
+                  </span>
+                </td>
+                <td>
+                  <StatusBadge status={q.status} />
+                </td>
+                <td>
+                  <span className="admin-actions">
+                    <button
+                      type="button"
+                      className="admin-button admin-button--secondary admin-button--small"
+                      onClick={() => void openPreview(q)}
+                    >
+                      👀 Xem trước
+                    </button>
+                    <button
+                      type="button"
+                      className="admin-button admin-button--secondary admin-button--small"
+                      onClick={() => void openEdit(q)}
+                    >
+                      Chỉnh sửa
+                    </button>
+                    <select
+                      className="admin-select admin-select--small"
+                      value={q.status}
+                      disabled={isMutating}
+                      onChange={(e) =>
+                        void handleStatusChange(
+                          q,
+                          e.target.value as QuestionStatus,
+                        )
+                      }
+                    >
+                      <option value="DRAFT">Bản nháp</option>
+                      <option value="PUBLISHED">Xuất bản</option>
+                      <option value="INACTIVE">Ngừng dùng</option>
+                    </select>
+                    <button
+                      type="button"
+                      className="admin-button admin-button--danger admin-button--small"
+                      onClick={() => setQuestionToDelete(q)}
+                    >
+                      Xóa
+                    </button>
+                  </span>
+                </td>
+              </tr>
+            ))}
+          </DataTable>
+
+          {/* Pagination Controls Bar */}
+          <div className="mt-4 flex flex-wrap items-center justify-between gap-4 rounded-xl border border-slate-200 bg-white p-4 text-xs font-semibold text-slate-600 shadow-sm">
+            <div className="flex items-center gap-2">
+              <span>Hiển thị</span>
+              <select
+                className="rounded-lg border border-slate-300 px-2 py-1 font-bold text-slate-700 outline-none focus:border-emerald-500"
+                value={pagination.limit}
+                onChange={(e) => {
+                  const newLimit = Number(e.target.value)
+                  setPagination((prev) => ({ ...prev, limit: newLimit, page: 1 }))
+                }}
+              >
+                <option value={20}>20 / trang</option>
+                <option value={50}>50 / trang</option>
+                <option value={100}>100 / trang</option>
+                <option value={200}>200 / trang</option>
+              </select>
+              <span>trên tổng <strong>{pagination.total}</strong> câu hỏi</span>
+            </div>
+
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                className="rounded-lg border border-slate-300 px-3 py-1.5 font-bold text-slate-700 hover:bg-slate-100 disabled:opacity-40 transition-colors"
+                disabled={pagination.page <= 1}
+                onClick={() => setPagination((prev) => ({ ...prev, page: prev.page - 1 }))}
+              >
+                ← Trang trước
+              </button>
+
+              <span className="px-2">
+                Trang <strong>{pagination.page}</strong> / <strong>{pagination.totalPages || 1}</strong>
+              </span>
+
+              <button
+                type="button"
+                className="rounded-lg border border-slate-300 px-3 py-1.5 font-bold text-slate-700 hover:bg-slate-100 disabled:opacity-40 transition-colors"
+                disabled={pagination.page >= (pagination.totalPages || 1)}
+                onClick={() => setPagination((prev) => ({ ...prev, page: prev.page + 1 }))}
+              >
+                Trang sau →
+              </button>
+            </div>
+          </div>
+        </>
       )}
 
       <QuestionPreviewModal

@@ -11,6 +11,11 @@ import type {
 } from '../types/course.types'
 
 export const adminCourseService = {
+  async getAllCourses(): Promise<CourseResponse[]> {
+    const response = await this.getAdminCourses({ limit: 100 })
+    return response.courses
+  },
+
   async getAdminCourses(
     params?: CourseListQueryParams,
   ): Promise<{ courses: CourseResponse[]; pagination: PaginationMeta }> {
