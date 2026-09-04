@@ -58,6 +58,12 @@ export function normalizeApiError(error: unknown): ApiError {
   if (error instanceof ApiError) return error
 
   if (axios.isAxiosError(error)) {
+    if (axios.isCancel(error) || error.code === 'ERR_CANCELED') {
+      return new ApiError({
+        code: 'REQUEST_CANCELED',
+        message: 'Yêu cầu đã được hủy.',
+      })
+    }
     if (!error.response) {
       return new ApiError({
         code: 'NETWORK_ERROR',

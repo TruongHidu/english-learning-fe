@@ -7,59 +7,95 @@ import { adminLessonService } from '../../services/admin-lesson.service'
 import { adminVocabularyService } from '../../services/admin-vocabulary.service'
 import { adminQuestionService } from '../../services/admin-question.service'
 import PageHeader from '../../components/admin/PageHeader'
+import LessonFormModal from '../../components/admin/LessonFormModal'
 import QuestionFormModal from '../../components/admin/QuestionFormModal'
 import VocabularyFormModal from '../../components/admin/VocabularyFormModal'
+import AiVocabularyPreview from '../../components/admin/AiVocabularyPreview'
+import AiQuestionPreview from '../../components/admin/AiQuestionPreview'
 import type {
   QuestionFormSubmission,
   QuestionMediaFieldErrors,
+  QuestionListItemResponse,
   QuestionResponse,
+  PendingQuestionAssignment,
 } from '../../types/question.types'
 import type {
   CreateVocabularyInput,
   VocabularyResponse,
 } from '../../types/vocabulary.types'
+import type { CourseResponse, SectionResponse } from '../../types/course.types'
+import type { TopicResponse } from '../../types/topic.types'
+import type { LessonResponse } from '../../types/lesson.types'
+import type { LessonFormValues } from '../../schemas/lesson.schema'
+import type {
+  AiGenerationStatus,
+  AiQuestionGenerationStatus,
+  AiSupportedQuestionType,
+  GeneratedQuestionCandidate,
+  GeneratedVocabularyCandidate,
+} from '../../types/admin-ai.types'
 import { getAdminContentError } from '../../utils/admin-content-errors'
+import {
+  getAiVocabularyError,
+  getAiQuestionError,
+  isRequestCanceled,
+} from '../../utils/admin-ai-errors'
 import { buildQuestionFormData } from '../../utils/question-media'
+
+type PreviewItem = VocabularyResponse | QuestionResponse
+
+function isQuestionDetail(
+  question: QuestionResponse | QuestionListItemResponse,
+): question is QuestionResponse {
+  return 'correctAnswer' in question
+}
 
 export default function AdminAIContentPage() {
   const [activeTab, setActiveTab] = useState<'VOCAB' | 'QUESTION'>('VOCAB')
 
   // 4-Step Cascade Select Data State: Course -> Section -> Topic -> Lesson
-  const [courses, setCourses] = useState<any[]>([])
+  const [courses, setCourses] = useState<CourseResponse[]>([])
   const [selectedCourseId, setSelectedCourseId] = useState('')
 
-  const [sections, setSections] = useState<any[]>([])
+  const [sections, setSections] = useState<SectionResponse[]>([])
   const [selectedSectionId, setSelectedSectionId] = useState('')
   const [isLoadingSections, setIsLoadingSections] = useState(false)
 
-  const [topics, setTopics] = useState<any[]>([])
+  const [topics, setTopics] = useState<TopicResponse[]>([])
   const [selectedTopicId, setSelectedTopicId] = useState('')
   const [isLoadingTopics, setIsLoadingTopics] = useState(false)
 
-  const [lessons, setLessons] = useState<any[]>([])
+  const [lessons, setLessons] = useState<LessonResponse[]>([])
   const [selectedLessonId, setSelectedLessonId] = useState('')
+  const [assignedQuestionIds, setAssignedQuestionIds] = useState<string[]>([])
   const [isLoadingLessons, setIsLoadingLessons] = useState(false)
+  const [isCreatingLesson, setIsCreatingLesson] = useState(false)
+  const [isAssigningQuestions, setIsAssigningQuestions] = useState(false)
+  const [lessonFormError, setLessonFormError] = useState<string | null>(null)
+  const [isLessonFormOpen, setIsLessonFormOpen] = useState(false)
+  const [pendingQuestionAssignment, setPendingQuestionAssignment] =
+    useState<PendingQuestionAssignment | null>(null)
 
-  const [vocabularies, setVocabularies] = useState<any[]>([])
-  const [selectedVocabId, setSelectedVocabId] = useState('')
-
+  const [vocabularies, setVocabularies] = useState<VocabularyResponse[]>([])
   // Form Parameters
-  const [vocabLevel, setVocabLevel] = useState<'A1' | 'A2' | 'B1' | 'B2' | 'C1' | 'C2'>('A1')
-  const [vocabQuantity, setVocabQuantity] = useState(20)
+  const [vocabQuantity, setVocabQuantity] = useState(10)
+  const [vocabRequirements, setVocabRequirements] = useState('')
 
-  const [questionTypes, setQuestionTypes] = useState<string[]>([
+  const [questionTypes, setQuestionTypes] = useState<AiSupportedQuestionType[]>([
     'MULTIPLE_CHOICE',
-    'FILL_IN_BLANK',
-    'TRANSLATION',
+    'FILL_BLANK',
     'MATCHING',
-    'REORDER',
+    'ORDER_SENTENCE',
   ])
   const [questionQuantity, setQuestionQuantity] = useState(8)
   const [questionDifficulty, setQuestionDifficulty] = useState<'EASY' | 'MEDIUM' | 'HARD'>('EASY')
+  const [questionRequirements, setQuestionRequirements] = useState('')
 
   // Status & Feedback States
   const [isGeneratingVocab, setIsGeneratingVocab] = useState(false)
+  const [isCommittingVocab, setIsCommittingVocab] = useState(false)
   const [isGeneratingQuestion, setIsGeneratingQuestion] = useState(false)
+  const [isCommittingQuestion, setIsCommittingQuestion] = useState(false)
   const [statusMessage, setStatusMessage] = useState<string | null>(null)
   const [errorMessage, setErrorMessage] = useState<string | null>(null)
 
@@ -72,16 +108,28 @@ export default function AdminAIContentPage() {
   const [selectedTargetVocabIds, setSelectedTargetVocabIds] = useState<string[]>([])
 
   // Draft List & Newly Generated States
-  const [draftVocabs, setDraftVocabs] = useState<any[]>([])
-  const [newlyGeneratedVocabs, setNewlyGeneratedVocabs] = useState<any[]>([])
+  const [draftVocabs, setDraftVocabs] = useState<VocabularyResponse[]>([])
+  const [vocabularyGenerationId, setVocabularyGenerationId] = useState<string | null>(null)
+  const [vocabularyGenerationStatus, setVocabularyGenerationStatus] =
+    useState<AiGenerationStatus | null>(null)
+  const [vocabularyCandidates, setVocabularyCandidates] =
+    useState<GeneratedVocabularyCandidate[]>([])
+  const [selectedCandidateKeys, setSelectedCandidateKeys] = useState<string[]>([])
+  const [questionGenerationId, setQuestionGenerationId] = useState<string | null>(null)
+  const [questionGenerationStatus, setQuestionGenerationStatus] =
+    useState<AiQuestionGenerationStatus | null>(null)
+  const [questionCandidates, setQuestionCandidates] =
+    useState<GeneratedQuestionCandidate[]>([])
+  const [selectedQuestionCandidateKeys, setSelectedQuestionCandidateKeys] =
+    useState<string[]>([])
 
-  const [draftQuestions, setDraftQuestions] = useState<any[]>([])
-  const [newlyGeneratedQuestions, setNewlyGeneratedQuestions] = useState<any[]>([])
+  const [draftQuestions, setDraftQuestions] = useState<QuestionListItemResponse[]>([])
+  const [newlyGeneratedQuestions, setNewlyGeneratedQuestions] = useState<QuestionResponse[]>([])
 
   const [isLoadingDrafts, setIsLoadingDrafts] = useState(false)
 
   // View / Edit Modal States for Vocab & Question
-  const [viewItem, setViewItem] = useState<any | null>(null)
+  const [viewItem, setViewItem] = useState<PreviewItem | null>(null)
   const [selectedVocabForModal, setSelectedVocabForModal] =
     useState<VocabularyResponse | null>(null)
   const [isVocabFormOpen, setIsVocabFormOpen] = useState(false)
@@ -101,6 +149,17 @@ export default function AdminAIContentPage() {
   // AbortController refs for cancellable AI generation
   const vocabAbortControllerRef = useRef<AbortController | null>(null)
   const questionAbortControllerRef = useRef<AbortController | null>(null)
+  const commitVocabInFlightRef = useRef(false)
+  const commitQuestionInFlightRef = useRef(false)
+  const assignmentInFlightRef = useRef(false)
+  const lessonLoadVersionRef = useRef(0)
+  const assignedLoadVersionRef = useRef(0)
+  const draftLoadVersionRef = useRef(0)
+
+  useEffect(() => () => {
+    vocabAbortControllerRef.current?.abort()
+    questionAbortControllerRef.current?.abort()
+  }, [])
 
   // Auto-dismiss status & error messages after 3 seconds
   useEffect(() => {
@@ -116,6 +175,20 @@ export default function AdminAIContentPage() {
       return () => clearTimeout(timer)
     }
   }, [errorMessage])
+
+  function resetVocabularyPreview() {
+    setVocabularyGenerationId(null)
+    setVocabularyGenerationStatus(null)
+    setVocabularyCandidates([])
+    setSelectedCandidateKeys([])
+  }
+
+  function resetQuestionPreview() {
+    setQuestionGenerationId(null)
+    setQuestionGenerationStatus(null)
+    setQuestionCandidates([])
+    setSelectedQuestionCandidateKeys([])
+  }
 
   // 1. Initial Load All Courses
   useEffect(() => {
@@ -137,21 +210,35 @@ export default function AdminAIContentPage() {
   }
 
   // Step 1: Course Selection Change -> Tải Sections
+  function confirmQuestionSelectionReset(): boolean {
+    if (selectedQuestionIds.length === 0 && !pendingQuestionAssignment) return true
+    return window.confirm(
+      'Bạn đang có câu hỏi đã chọn hoặc thao tác gán chưa hoàn tất. Đổi Topic sẽ xóa lựa chọn hiện tại, bạn có muốn tiếp tục?',
+    )
+  }
+
   async function handleCourseChange(courseId: string) {
+    if (!confirmQuestionSelectionReset()) return
+    assignedLoadVersionRef.current += 1
+    draftLoadVersionRef.current += 1
     setSelectedCourseId(courseId)
     setSelectedSectionId('')
     setSections([])
     setSelectedTopicId('')
     setTopics([])
     setSelectedLessonId('')
+    setAssignedQuestionIds([])
     setLessons([])
     setVocabularies([])
-    setSelectedVocabId('')
     setSelectedTargetVocabIds([])
     setDraftVocabs([])
     setDraftQuestions([])
     setSelectedVocabIds([])
     setSelectedQuestionIds([])
+    setPendingQuestionAssignment(null)
+    setLessonFormError(null)
+    resetVocabularyPreview()
+    resetQuestionPreview()
 
     if (courseId) {
       await loadSectionsByCourse(courseId)
@@ -177,18 +264,25 @@ export default function AdminAIContentPage() {
 
   // Step 2: Section Selection Change -> Tải Topics
   async function handleSectionChange(sectionId: string) {
+    if (!confirmQuestionSelectionReset()) return
+    assignedLoadVersionRef.current += 1
+    draftLoadVersionRef.current += 1
     setSelectedSectionId(sectionId)
     setSelectedTopicId('')
     setTopics([])
     setSelectedLessonId('')
+    setAssignedQuestionIds([])
     setLessons([])
     setVocabularies([])
-    setSelectedVocabId('')
     setSelectedTargetVocabIds([])
     setDraftVocabs([])
     setDraftQuestions([])
     setSelectedVocabIds([])
     setSelectedQuestionIds([])
+    setPendingQuestionAssignment(null)
+    setLessonFormError(null)
+    resetVocabularyPreview()
+    resetQuestionPreview()
 
     if (sectionId) {
       await loadTopicsBySection(sectionId)
@@ -214,16 +308,23 @@ export default function AdminAIContentPage() {
 
   // Step 3: Topic Selection Change -> Tải Lessons & Vocabs & Drafts
   async function handleTopicChange(topicId: string) {
+    if (!confirmQuestionSelectionReset()) return
+    assignedLoadVersionRef.current += 1
+    draftLoadVersionRef.current += 1
     setSelectedTopicId(topicId)
     setSelectedLessonId('')
+    setAssignedQuestionIds([])
     setLessons([])
     setVocabularies([])
-    setSelectedVocabId('')
     setSelectedTargetVocabIds([])
     setDraftVocabs([])
     setDraftQuestions([])
     setSelectedVocabIds([])
     setSelectedQuestionIds([])
+    setPendingQuestionAssignment(null)
+    setLessonFormError(null)
+    resetVocabularyPreview()
+    resetQuestionPreview()
 
     if (topicId) {
       await loadLessonsAndVocabs(topicId)
@@ -231,31 +332,54 @@ export default function AdminAIContentPage() {
   }
 
   async function loadLessonsAndVocabs(topicId: string) {
+    const requestVersion = ++lessonLoadVersionRef.current
     setIsLoadingLessons(true)
     try {
       const [lessonData, vocabRes] = await Promise.all([
         adminLessonService.getLessonsByTopic(topicId),
         adminVocabularyService.getVocabulariesByTopic(topicId),
       ])
+      if (requestVersion !== lessonLoadVersionRef.current) return
       setLessons(lessonData)
       if (lessonData.length > 0) {
         setSelectedLessonId(lessonData[0].id)
+        void loadAssignedQuestionIds(lessonData[0].id)
       } else {
         setSelectedLessonId('')
+        setAssignedQuestionIds([])
       }
       setVocabularies(vocabRes.vocabularies)
-      setSelectedVocabId('')
       void loadDraftsForTopic(topicId)
     } catch (err) {
+      if (requestVersion !== lessonLoadVersionRef.current) return
       console.error('Failed to load lessons and vocabularies for topic', err)
     } finally {
-      setIsLoadingLessons(false)
+      if (requestVersion === lessonLoadVersionRef.current) setIsLoadingLessons(false)
     }
+  }
+
+  async function loadAssignedQuestionIds(lessonId: string) {
+    const requestVersion = ++assignedLoadVersionRef.current
+    try {
+      const assignments = await adminQuestionService.getLessonQuestions(lessonId)
+      if (requestVersion !== assignedLoadVersionRef.current) return
+      setAssignedQuestionIds(assignments.map((assignment) => assignment.questionId))
+    } catch (error: unknown) {
+      if (requestVersion !== assignedLoadVersionRef.current) return
+      setErrorMessage(getAdminContentError(error, 'Không thể tải danh sách câu hỏi đã gán.'))
+    }
+  }
+
+  function handleLessonSelection(lessonId: string) {
+    setSelectedLessonId(lessonId)
+    setAssignedQuestionIds([])
+    if (lessonId) void loadAssignedQuestionIds(lessonId)
   }
 
   // Fetch up to 500 draft items for BOTH Vocabs and Questions simultaneously
   async function loadDraftsForTopic(topicId: string) {
     if (!topicId) return
+    const requestVersion = ++draftLoadVersionRef.current
     setIsLoadingDrafts(true)
     setSelectedVocabIds([])
     setSelectedQuestionIds([])
@@ -264,12 +388,14 @@ export default function AdminAIContentPage() {
         adminVocabularyService.getVocabulariesByTopic(topicId, { status: 'DRAFT', limit: 500 }),
         adminQuestionService.getQuestionsByTopic(topicId, { status: 'DRAFT', limit: 500 }),
       ])
+      if (requestVersion !== draftLoadVersionRef.current) return
       setDraftVocabs(vRes.vocabularies)
       setDraftQuestions(qRes.questions)
     } catch (err) {
+      if (requestVersion !== draftLoadVersionRef.current) return
       console.error('Failed to load drafts', err)
     } finally {
-      setIsLoadingDrafts(false)
+      if (requestVersion === draftLoadVersionRef.current) setIsLoadingDrafts(false)
     }
   }
 
@@ -307,38 +433,119 @@ export default function AdminAIContentPage() {
       return
     }
 
+    vocabAbortControllerRef.current?.abort()
     const controller = new AbortController()
     vocabAbortControllerRef.current = controller
     setIsGeneratingVocab(true)
     setErrorMessage(null)
     setStatusMessage(null)
     try {
-      const qty = Math.max(1, Math.min(50, Number(vocabQuantity) || 20))
-      const res = await adminAiService.generateVocabularies(
+      const count = Math.max(1, Math.min(20, Number(vocabQuantity) || 10))
+      const result = await adminAiService.generateVocabularyPreview(
+        selectedTopicId,
         {
-          topicId: selectedTopicId,
-          lessonId: selectedLessonId || undefined,
-          level: vocabLevel,
-          quantity: qty,
+          count,
+          requirements: vocabRequirements.trim() || undefined,
         },
-        { signal: controller.signal }
+        { signal: controller.signal },
       )
-      setNewlyGeneratedVocabs(res.vocabularies)
-      setViewFilter('NEWLY_GENERATED')
-      setSelectedVocabIds([])
-      setStatusMessage(`AI đã tạo đúng ${res.count} từ vựng mới thuộc bài/chủ đề đã chọn và lưu vào danh sách nháp!`)
-      await loadDraftsForTopic(selectedTopicId)
-      void loadLessonsAndVocabs(selectedTopicId)
-    } catch (err: any) {
-      console.error('handleGenerateVocab error:', err)
-      if (err?.name === 'CanceledError' || err?.name === 'AbortError' || err?.code === 'ERR_CANCELED' || err?.message?.includes('canceled')) {
-        setStatusMessage('Đã hủy lệnh AI tạo từ vựng!')
+      setVocabularyGenerationId(result.generationId)
+      setVocabularyGenerationStatus(
+        result.generatedCount >= result.requestedCount ? 'COMPLETED' : 'PARTIAL',
+      )
+      setVocabularyCandidates(result.candidates)
+      setSelectedCandidateKeys(
+        result.candidates.map((candidate) => candidate.candidateKey),
+      )
+      setStatusMessage(
+        'AI đã tạo danh sách đề xuất, vui lòng kiểm tra trước khi lưu',
+      )
+    } catch (error: unknown) {
+      if (isRequestCanceled(error)) {
+        setStatusMessage('Đã hủy yêu cầu tạo đề xuất từ vựng.')
       } else {
-        setErrorMessage(getAdminContentError(err, 'Lỗi khi AI sinh từ vựng'))
+        setErrorMessage(
+          getAiVocabularyError(error, 'Không thể tạo đề xuất từ vựng bằng AI.'),
+        )
       }
     } finally {
-      setIsGeneratingVocab(false)
-      vocabAbortControllerRef.current = null
+      if (vocabAbortControllerRef.current === controller) {
+        setIsGeneratingVocab(false)
+        vocabAbortControllerRef.current = null
+      }
+    }
+  }
+
+  async function handleCommitVocabularies() {
+    if (
+      commitVocabInFlightRef.current ||
+      isCommittingVocab ||
+      !vocabularyGenerationId
+    ) {
+      return
+    }
+
+    const selectedKeySet = new Set(selectedCandidateKeys)
+    const selectedItems = vocabularyCandidates.filter((candidate) =>
+      selectedKeySet.has(candidate.candidateKey),
+    )
+    if (selectedItems.length === 0) {
+      setErrorMessage('Vui lòng chọn ít nhất một đề xuất để lưu.')
+      return
+    }
+
+    commitVocabInFlightRef.current = true
+    setIsCommittingVocab(true)
+    setErrorMessage(null)
+    setStatusMessage(null)
+    try {
+      const result = await adminAiService.commitVocabularyGeneration(
+        vocabularyGenerationId,
+        { items: selectedItems },
+      )
+      const committedKeys = new Set(selectedItems.map((item) => item.candidateKey))
+      setVocabularyCandidates((current) =>
+        current.filter((candidate) => !committedKeys.has(candidate.candidateKey)),
+      )
+      setSelectedCandidateKeys([])
+      setVocabularyGenerationStatus('COMMITTED')
+
+      try {
+        const [draftResult, allResult] = await Promise.all([
+          adminVocabularyService.getVocabulariesByTopic(selectedTopicId, {
+            status: 'DRAFT',
+            limit: 500,
+          }),
+          adminVocabularyService.getVocabulariesByTopic(selectedTopicId, {
+            limit: 500,
+          }),
+        ])
+        setDraftVocabs(draftResult.vocabularies)
+        setVocabularies(allResult.vocabularies)
+      } catch (reloadError: unknown) {
+        setStatusMessage(
+          `Đã lưu ${result.committedCount} Vocabulary DRAFT, nhưng chưa tải lại được danh sách.`,
+        )
+        setErrorMessage(
+          getAiVocabularyError(
+            reloadError,
+            'Hãy tải lại trang để xem các Vocabulary vừa lưu.',
+          ),
+        )
+        return
+      }
+      setStatusMessage(
+        result.alreadyCommitted
+          ? 'Generation này đã được lưu trước đó. Danh sách DRAFT đã được tải lại.'
+          : `Đã lưu thành công ${result.committedCount} Vocabulary DRAFT.`,
+      )
+    } catch (error: unknown) {
+      setErrorMessage(
+        getAiVocabularyError(error, 'Không thể lưu các đề xuất đã chọn.'),
+      )
+    } finally {
+      commitVocabInFlightRef.current = false
+      setIsCommittingVocab(false)
     }
   }
 
@@ -360,53 +567,134 @@ export default function AdminAIContentPage() {
       setErrorMessage('Vui lòng chọn ít nhất 1 loại câu hỏi')
       return
     }
+    if (vocabularies.length === 0) {
+      setErrorMessage('Chủ đề chưa có từ vựng hợp lệ để tạo câu hỏi.')
+      return
+    }
 
+    questionAbortControllerRef.current?.abort()
     const controller = new AbortController()
     questionAbortControllerRef.current = controller
     setIsGeneratingQuestion(true)
     setErrorMessage(null)
     setStatusMessage(null)
     try {
-      const qty = Math.max(1, Math.min(50, Number(questionQuantity) || 10))
-      const res = await adminAiService.generateQuestions(
+      const count = Math.max(1, Math.min(50, Number(questionQuantity) || 10))
+      const result = await adminAiService.generateQuestionPreview(
+        selectedTopicId,
         {
-          topicId: selectedTopicId,
           lessonId: selectedLessonId || undefined,
-          vocabularyId: selectedVocabId || undefined,
           vocabularyIds: selectedTargetVocabIds.length > 0 ? selectedTargetVocabIds : undefined,
           questionTypes,
-          quantity: qty,
+          count,
           difficulty: questionDifficulty,
+          requirements: questionRequirements.trim() || undefined,
         },
         { signal: controller.signal }
       )
-      setNewlyGeneratedQuestions(res.questions)
-      setViewFilter('NEWLY_GENERATED')
-      setSelectedQuestionIds([])
-      setStatusMessage(`AI đã tạo đúng ${res.count} câu hỏi mới và lưu vào danh sách nháp!`)
-      await loadDraftsForTopic(selectedTopicId)
-    } catch (err: any) {
-      console.error('handleGenerateQuestion error:', err)
-      if (err?.name === 'CanceledError' || err?.name === 'AbortError' || err?.code === 'ERR_CANCELED' || err?.message?.includes('canceled')) {
-        setStatusMessage('Đã hủy lệnh AI tạo câu hỏi!')
+      setQuestionGenerationId(result.generationId)
+      setQuestionGenerationStatus(result.status)
+      setQuestionCandidates(result.candidates)
+      setSelectedQuestionCandidateKeys(
+        result.candidates.map((candidate) => candidate.candidateKey),
+      )
+      setStatusMessage(
+        `AI đã tạo ${result.acceptedCount} đề xuất câu hỏi, vui lòng kiểm tra trước khi lưu.`,
+      )
+    } catch (error: unknown) {
+      if (isRequestCanceled(error)) {
+        setStatusMessage('Đã hủy yêu cầu tạo đề xuất câu hỏi.')
       } else {
-        setErrorMessage(getAdminContentError(err, 'Lỗi khi AI sinh câu hỏi'))
+        setErrorMessage(getAiQuestionError(error, 'Không thể tạo đề xuất câu hỏi bằng AI.'))
       }
     } finally {
-      setIsGeneratingQuestion(false)
-      questionAbortControllerRef.current = null
+      if (questionAbortControllerRef.current === controller) {
+        setIsGeneratingQuestion(false)
+        questionAbortControllerRef.current = null
+      }
+    }
+  }
+
+  async function handleCommitQuestions() {
+    if (
+      commitQuestionInFlightRef.current ||
+      isCommittingQuestion ||
+      !questionGenerationId
+    ) return
+
+    const selected = new Set(selectedQuestionCandidateKeys)
+    const items = questionCandidates.filter((candidate) =>
+      selected.has(candidate.candidateKey),
+    )
+    if (items.length === 0) {
+      setErrorMessage('Vui lòng chọn ít nhất một đề xuất câu hỏi để lưu.')
+      return
+    }
+    const targetLessonId = selectedLessonId
+
+    commitQuestionInFlightRef.current = true
+    setIsCommittingQuestion(true)
+    setErrorMessage(null)
+    setStatusMessage(null)
+    try {
+      const result = await adminAiService.commitQuestionGeneration(
+        questionGenerationId,
+        { items },
+      )
+      setQuestionGenerationStatus('COMMITTED')
+      setQuestionCandidates([])
+      setSelectedQuestionCandidateKeys([])
+      setNewlyGeneratedQuestions(result.questions)
+      setViewFilter('NEWLY_GENERATED')
+      await loadDraftsForTopic(selectedTopicId)
+      const committedQuestionIds = result.questions.map((question) => question.id)
+      setSelectedQuestionIds(committedQuestionIds)
+
+      if (targetLessonId && committedQuestionIds.length > 0) {
+        setPendingQuestionAssignment({
+          topicId: selectedTopicId,
+          lessonId: targetLessonId,
+          questionIds: committedQuestionIds,
+        })
+        const assigned = await assignQuestionsToLesson(
+          targetLessonId,
+          committedQuestionIds,
+        )
+        if (assigned) {
+          setStatusMessage(
+            result.alreadyCommitted
+              ? 'Generation đã được lưu trước đó và Question đã được gán vào Lesson đã chọn.'
+              : `Đã lưu ${result.committedCount} Question DRAFT và gán vào Lesson đã chọn.`,
+          )
+        } else {
+          setStatusMessage(
+            `Đã lưu ${result.committedCount} Question DRAFT nhưng chưa gán được vào Lesson. Hãy bấm “Thử gán lại”.`,
+          )
+        }
+        return
+      }
+
+      setStatusMessage(
+        result.alreadyCommitted
+          ? 'Generation đã được commit trước đó; danh sách DRAFT đã được tải lại.'
+          : `Đã lưu ${result.committedCount} Question DRAFT. Chọn một Lesson để gán câu hỏi.`,
+      )
+    } catch (error: unknown) {
+      setErrorMessage(getAiQuestionError(error, 'Không thể lưu các đề xuất câu hỏi.'))
+    } finally {
+      commitQuestionInFlightRef.current = false
+      setIsCommittingQuestion(false)
     }
   }
 
   // --- Handlers: Multi-Select Checkboxes ---
-  const activeVocabsToShow = viewFilter === 'NEWLY_GENERATED' ? newlyGeneratedVocabs : draftVocabs
   const activeQuestionsToShow = viewFilter === 'NEWLY_GENERATED' ? newlyGeneratedQuestions : draftQuestions
 
   function toggleSelectAllVocabs() {
-    if (selectedVocabIds.length === activeVocabsToShow.length) {
+    if (selectedVocabIds.length === draftVocabs.length) {
       setSelectedVocabIds([])
     } else {
-      setSelectedVocabIds(activeVocabsToShow.map((v) => v.id))
+      setSelectedVocabIds(draftVocabs.map((vocabulary) => vocabulary.id))
     }
   }
 
@@ -430,11 +718,10 @@ export default function AdminAIContentPage() {
   async function handlePublishVocab(vocabId: string) {
     try {
       await adminVocabularyService.updateVocabularyStatus(vocabId, 'PUBLISHED')
-      setStatusMessage('Đã duyệt & phát hành từ vựng sang PUBLISHED vào bài học!')
-      setNewlyGeneratedVocabs((prev) => prev.filter((v) => v.id !== vocabId))
+      setStatusMessage('Vocabulary đã chuyển sang trạng thái PUBLISHED.')
       setSelectedVocabIds((prev) => prev.filter((i) => i !== vocabId))
       void loadDraftsForTopic(selectedTopicId)
-    } catch (err) {
+    } catch {
       setErrorMessage('Lỗi duyệt từ vựng')
     }
   }
@@ -444,24 +731,24 @@ export default function AdminAIContentPage() {
     try {
       await adminVocabularyService.deleteVocabulary(vocabId)
       setStatusMessage('Đã xóa từ vựng khỏi hệ thống.')
-      setNewlyGeneratedVocabs((prev) => prev.filter((v) => v.id !== vocabId))
       setSelectedVocabIds((prev) => prev.filter((i) => i !== vocabId))
       void loadDraftsForTopic(selectedTopicId)
-    } catch (err) {
+    } catch {
       setErrorMessage('Lỗi xóa từ vựng')
     }
   }
 
   async function handleBulkPublishVocabs() {
-    const idsToPublish = selectedVocabIds.length > 0 ? selectedVocabIds : activeVocabsToShow.map((v) => v.id)
+    const idsToPublish = selectedVocabIds.length > 0
+      ? selectedVocabIds
+      : draftVocabs.map((vocabulary) => vocabulary.id)
     if (idsToPublish.length === 0) return
     try {
       await adminAiService.bulkPublishVocabularies(idsToPublish)
-      setStatusMessage(`Đã duyệt & phát hành thành công ${idsToPublish.length} từ vựng vào bài học!`)
-      setNewlyGeneratedVocabs((prev) => prev.filter((v) => !idsToPublish.includes(v.id)))
+      setStatusMessage(`Đã chuyển ${idsToPublish.length} Vocabulary sang PUBLISHED.`)
       setSelectedVocabIds([])
       void loadDraftsForTopic(selectedTopicId)
-    } catch (err) {
+    } catch {
       setErrorMessage('Lỗi duyệt hàng loạt từ vựng')
     }
   }
@@ -472,15 +759,14 @@ export default function AdminAIContentPage() {
     try {
       await adminAiService.bulkDeleteVocabularies(selectedVocabIds)
       setStatusMessage(`Đã xóa thành công ${selectedVocabIds.length} từ vựng đã chọn!`)
-      setNewlyGeneratedVocabs((prev) => prev.filter((v) => !selectedVocabIds.includes(v.id)))
       setSelectedVocabIds([])
       void loadDraftsForTopic(selectedTopicId)
-    } catch (err) {
+    } catch {
       setErrorMessage('Lỗi xóa hàng loạt từ vựng')
     }
   }
 
-  async function openEditVocab(v: any) {
+  async function openEditVocab(v: VocabularyResponse) {
     setVocabFormServerError(null)
     try {
       const fullVocab = await adminVocabularyService.getVocabularyById(v.id)
@@ -508,19 +794,130 @@ export default function AdminAIContentPage() {
     }
   }
 
+  // --- Handlers: Question assignment (kept separate from Publish) ---
+  async function assignQuestionsToLesson(lessonId: string, questionIds: string[]): Promise<boolean> {
+    if (assignmentInFlightRef.current || questionIds.length === 0) return false
+    assignmentInFlightRef.current = true
+    setIsAssigningQuestions(true)
+    setErrorMessage(null)
+    try {
+      const result = await adminQuestionService.assignQuestionsToLessonWithResult(lessonId, {
+        questionIds: [...new Set(questionIds)],
+      })
+      setLessons((current) => {
+        const withoutUpdated = current.filter((lesson) => lesson.id !== result.lesson.id)
+        return [...withoutUpdated, result.lesson].sort(
+          (left, right) => left.orderIndex - right.orderIndex || left.createdAt.localeCompare(right.createdAt),
+        )
+      })
+      setSelectedLessonId(result.lesson.id)
+      setAssignedQuestionIds((current) => Array.from(new Set([
+        ...current,
+        ...result.questions.map((assignment) => assignment.questionId),
+      ])))
+      setSelectedQuestionIds((current) => current.filter((id) => !questionIds.includes(id)))
+      setPendingQuestionAssignment(null)
+      setStatusMessage(
+        result.skippedCount > 0
+          ? `Đã gán ${result.assignedCount} câu hỏi; bỏ qua ${result.skippedCount} câu đã có trong Lesson.`
+          : `Đã gán ${result.assignedCount} câu hỏi vào Lesson DRAFT.`,
+      )
+      return true
+    } catch (error: unknown) {
+      setErrorMessage(getAdminContentError(error, 'Không thể gán câu hỏi vào Lesson.'))
+      return false
+    } finally {
+      assignmentInFlightRef.current = false
+      setIsAssigningQuestions(false)
+    }
+  }
+
+  async function handleAssignSelectedQuestions() {
+    if (!selectedTopicId) {
+      setErrorMessage('Vui lòng chọn Topic trước khi gán câu hỏi.')
+      return
+    }
+    if (!selectedLessonId) {
+      setErrorMessage('Vui lòng chọn Lesson hoặc tạo Lesson mới trước khi gán.')
+      return
+    }
+    if (selectedQuestionIds.length === 0) {
+      setErrorMessage('Vui lòng chọn ít nhất một câu hỏi để gán.')
+      return
+    }
+    await assignQuestionsToLesson(selectedLessonId, selectedQuestionIds)
+  }
+
+  async function handleCreateLessonForAssignment(values: LessonFormValues) {
+    if (!selectedTopicId) {
+      setLessonFormError('Vui lòng chọn Topic trước khi tạo Lesson.')
+      return
+    }
+
+    const questionIds = [...new Set(selectedQuestionIds)]
+    const topicId = selectedTopicId
+    setIsCreatingLesson(true)
+    setLessonFormError(null)
+    setErrorMessage(null)
+    try {
+      const lesson = await adminLessonService.createLessonForAssignment(topicId, {
+        name: values.name,
+        description: values.description,
+        orderIndex: values.orderIndex,
+        requiredScore: values.requiredScore,
+        xpReward: values.xpReward,
+        diamondReward: values.diamondReward,
+        questionCount: 0,
+        status: 'DRAFT',
+      })
+      setLessons((current) => [...current, lesson].sort(
+        (left, right) => left.orderIndex - right.orderIndex || left.createdAt.localeCompare(right.createdAt),
+      ))
+      setSelectedLessonId(lesson.id)
+      setAssignedQuestionIds([])
+      setIsLessonFormOpen(false)
+
+      if (questionIds.length === 0) {
+        setPendingQuestionAssignment(null)
+        setStatusMessage(
+          'Đã tạo Lesson DRAFT. Lesson này đã được chọn để nhận các câu hỏi AI sau khi lưu.',
+        )
+        return
+      }
+
+      setPendingQuestionAssignment({ topicId, questionIds, lessonId: lesson.id })
+      setStatusMessage('Đã tạo Lesson DRAFT. Đang gán các câu hỏi đã chọn...')
+      const assigned = await assignQuestionsToLesson(lesson.id, questionIds)
+      if (!assigned) {
+        setStatusMessage('Lesson đã được tạo nhưng chưa gán câu hỏi. Bạn có thể thử gán lại.')
+      }
+    } catch (error: unknown) {
+      setLessonFormError(getAdminContentError(error, 'Không thể tạo Lesson mới.'))
+    } finally {
+      setIsCreatingLesson(false)
+    }
+  }
+
+  async function retryPendingQuestionAssignment() {
+    const pending = pendingQuestionAssignment
+    if (!pending || !pending.lessonId) return
+    if (pending.topicId !== selectedTopicId) {
+      setErrorMessage('Topic hiện tại không khớp với Lesson đang chờ gán.')
+      return
+    }
+    await assignQuestionsToLesson(pending.lessonId, pending.questionIds)
+  }
+
   // --- Handlers: Question Actions (Single & Bulk) ---
   async function handlePublishQuestion(qId: string) {
     try {
       await adminQuestionService.updateQuestionStatus(qId, 'PUBLISHED')
-      if (selectedLessonId) {
-        await adminQuestionService.assignQuestionsToLesson(selectedLessonId, [qId]).catch(() => {})
-      }
-      setStatusMessage('Đã duyệt & phát hành câu hỏi sang PUBLISHED và gán vào bài học!')
+      setStatusMessage('Đã chuyển câu hỏi sang trạng thái PUBLISHED. Gán vào Lesson là thao tác riêng.')
       setNewlyGeneratedQuestions((prev) => prev.filter((q) => q.id !== qId))
       setSelectedQuestionIds((prev) => prev.filter((i) => i !== qId))
       void loadDraftsForTopic(selectedTopicId)
-    } catch (err) {
-      setErrorMessage('Lỗi duyệt câu hỏi')
+    } catch (error: unknown) {
+      setErrorMessage(getAdminContentError(error, 'Không thể Publish câu hỏi.'))
     }
   }
 
@@ -529,11 +926,12 @@ export default function AdminAIContentPage() {
     try {
       await adminQuestionService.deleteQuestion(qId)
       setStatusMessage('Đã xóa câu hỏi khỏi hệ thống.')
-      setNewlyGeneratedQuestions((prev) => prev.filter((q) => q.id !== qId && q._id !== qId))
-      setDraftQuestions((prev) => prev.filter((q) => q.id !== qId && q._id !== qId))
+      setNewlyGeneratedQuestions((prev) => prev.filter((q) => q.id !== qId))
+      setDraftQuestions((prev) => prev.filter((q) => q.id !== qId))
       setSelectedQuestionIds((prev) => prev.filter((i) => i !== qId))
-    } catch (err: any) {
-      setErrorMessage(err.response?.data?.message || 'Lỗi xóa câu hỏi')
+      setAssignedQuestionIds((prev) => prev.filter((id) => id !== qId))
+    } catch (err: unknown) {
+      setErrorMessage(getAdminContentError(err, 'Lỗi xóa câu hỏi'))
     }
   }
 
@@ -542,15 +940,12 @@ export default function AdminAIContentPage() {
     if (idsToPublish.length === 0) return
     try {
       await adminAiService.bulkPublishQuestions(idsToPublish)
-      if (selectedLessonId) {
-        await adminQuestionService.assignQuestionsToLesson(selectedLessonId, idsToPublish).catch(() => {})
-      }
-      setStatusMessage(`Đã duyệt & phát hành thành công ${idsToPublish.length} câu hỏi vào bài học!`)
+      setStatusMessage(`Đã chuyển ${idsToPublish.length} câu hỏi sang PUBLISHED. Gán vào Lesson là thao tác riêng.`)
       setNewlyGeneratedQuestions((prev) => prev.filter((q) => !idsToPublish.includes(q.id)))
       setSelectedQuestionIds([])
       void loadDraftsForTopic(selectedTopicId)
-    } catch (err) {
-      setErrorMessage('Lỗi duyệt hàng loạt câu hỏi')
+    } catch (error: unknown) {
+      setErrorMessage(getAdminContentError(error, 'Không thể Publish các câu hỏi đã chọn.'))
     }
   }
 
@@ -561,23 +956,37 @@ export default function AdminAIContentPage() {
       await adminAiService.bulkDeleteQuestions(selectedQuestionIds)
       setStatusMessage(`Đã xóa thành công ${selectedQuestionIds.length} câu hỏi đã chọn!`)
       setNewlyGeneratedQuestions((prev) => prev.filter((q) => !selectedQuestionIds.includes(q.id)))
+      setAssignedQuestionIds((prev) => prev.filter((id) => !selectedQuestionIds.includes(id)))
       setSelectedQuestionIds([])
       void loadDraftsForTopic(selectedTopicId)
-    } catch (err) {
+    } catch {
       setErrorMessage('Lỗi xóa hàng loạt câu hỏi')
     }
   }
 
-  async function openEditQuestion(q: any) {
+  async function openEditQuestion(q: QuestionResponse | QuestionListItemResponse) {
     setQuestionFormServerError(null)
     setQuestionFormServerMediaErrors({})
     try {
       const fullQuestion = await adminQuestionService.getQuestionById(q.id)
       setSelectedQuestionForModal(fullQuestion)
-    } catch {
-      setSelectedQuestionForModal(q)
+    } catch (error: unknown) {
+      setErrorMessage(getAdminContentError(error, 'Không thể tải chi tiết câu hỏi.'))
+      return
     }
     setIsQuestionFormOpen(true)
+  }
+
+  async function openViewQuestion(q: QuestionResponse | QuestionListItemResponse) {
+    if (isQuestionDetail(q)) {
+      setViewItem(q)
+      return
+    }
+    try {
+      setViewItem(await adminQuestionService.getQuestionById(q.id))
+    } catch (error: unknown) {
+      setErrorMessage(getAdminContentError(error, 'Không thể tải chi tiết câu hỏi.'))
+    }
   }
 
   const handleQuestionFormSubmit = async (submission: QuestionFormSubmission) => {
@@ -610,14 +1019,14 @@ export default function AdminAIContentPage() {
       {/* Header */}
       <PageHeader
         title="AI Tạo Nội Dung Học Tập Tự Động"
-        description="Chọn tuần tự 4 bước: 1. Khóa học -> 2. Phần học (Section) -> 3. Chủ đề (Topic) -> 4. Bài học (Lesson)."
+        description="AI tạo đề xuất để Admin kiểm tra; chỉ các mục được chọn và commit mới trở thành DRAFT trong hệ thống."
       />
 
       {/* AI Disclaimer Alert */}
       <div className="flex items-center gap-2.5 rounded-2xl border border-amber-200/90 bg-amber-50/70 px-4 py-3 text-xs font-semibold text-amber-800 shadow-sm dark:border-amber-900/50 dark:bg-amber-950/40 dark:text-amber-300">
         <span className="text-base">⚠️</span>
         <span>
-          <strong>Lưu ý:</strong> Nội dung do AI cung cấp có thể không chính xác. Vui lòng kiểm tra và chỉnh sửa kỹ trước khi duyệt (Approve) phát hành vào bài học.
+          <strong>Lưu ý:</strong> Đề xuất AI chưa được lưu vào database. Hãy kiểm tra, chỉnh sửa và commit thành DRAFT trước; thao tác Publish chỉ dành cho record đã lưu.
         </span>
       </div>
 
@@ -627,7 +1036,6 @@ export default function AdminAIContentPage() {
           type="button"
           onClick={() => {
             setActiveTab('VOCAB')
-            setViewFilter('NEWLY_GENERATED')
             setSelectedVocabIds([])
             if (selectedTopicId) void loadDraftsForTopic(selectedTopicId)
           }}
@@ -677,17 +1085,17 @@ export default function AdminAIContentPage() {
             className="rounded-3xl border-2 border-gray-200 bg-white p-6 shadow-sm dark:border-gray-800 dark:bg-gray-900 space-y-4"
           >
             <h2 className="text-base font-black text-gray-900 dark:text-white">
-              Chọn Đủ 4 Bước Tuần Tự (Course ➔ Section ➔ Topic ➔ Lesson)
+              Chọn Course ➔ Section ➔ Topic để tạo đề xuất từ vựng
             </h2>
 
-            {/* 4-Step Cascade Select: Course -> Section -> Topic -> Lesson */}
-            <div className="grid gap-4 sm:grid-cols-4">
+            <div className="grid gap-4 sm:grid-cols-3">
               <div>
                 <label className="block text-xs font-black uppercase text-gray-700 dark:text-gray-300 mb-1">
                   1. Khóa học (Bắt buộc)
                 </label>
                 <select
                   value={selectedCourseId}
+                  disabled={isGeneratingVocab || isCommittingVocab}
                   onChange={(e) => handleCourseChange(e.target.value)}
                   className="w-full rounded-xl border border-gray-300 bg-white p-2.5 text-xs font-bold text-gray-800 outline-none focus:border-emerald-500 dark:border-gray-700 dark:bg-gray-900 dark:text-white"
                 >
@@ -705,7 +1113,7 @@ export default function AdminAIContentPage() {
                   2. Phần học ({selectedCourseId ? 'Bắt buộc' : 'Vui lòng chọn 1 trước'})
                 </label>
                 <select
-                  disabled={!selectedCourseId || isLoadingSections}
+                  disabled={!selectedCourseId || isLoadingSections || isGeneratingVocab || isCommittingVocab}
                   value={selectedSectionId}
                   onChange={(e) => handleSectionChange(e.target.value)}
                   className="w-full rounded-xl border border-gray-300 bg-white p-2.5 text-xs font-bold text-gray-800 outline-none focus:border-emerald-500 disabled:bg-gray-100 disabled:opacity-60 dark:border-gray-700 dark:bg-gray-900 dark:text-white"
@@ -726,7 +1134,7 @@ export default function AdminAIContentPage() {
                   3. Chủ đề ({selectedSectionId ? 'Bắt buộc' : 'Vui lòng chọn 2 trước'})
                 </label>
                 <select
-                  disabled={!selectedSectionId || isLoadingTopics}
+                  disabled={!selectedSectionId || isLoadingTopics || isGeneratingVocab || isCommittingVocab}
                   value={selectedTopicId}
                   onChange={(e) => handleTopicChange(e.target.value)}
                   className="w-full rounded-xl border border-gray-300 bg-white p-2.5 text-xs font-bold text-gray-800 outline-none focus:border-emerald-500 disabled:bg-gray-100 disabled:opacity-60 dark:border-gray-700 dark:bg-gray-900 dark:text-white"
@@ -742,46 +1150,16 @@ export default function AdminAIContentPage() {
                 </select>
               </div>
 
-              <div>
-                <label className="block text-xs font-black uppercase text-gray-700 dark:text-gray-300 mb-1">
-                  4. Bài học ({selectedTopicId ? 'Tùy chọn' : 'Vui lòng chọn 3 trước'})
-                </label>
-                <select
-                  disabled={!selectedTopicId || isLoadingLessons}
-                  value={selectedLessonId}
-                  onChange={(e) => setSelectedLessonId(e.target.value)}
-                  className="w-full rounded-xl border border-gray-300 bg-white p-2.5 text-xs font-bold text-gray-800 outline-none focus:border-emerald-500 disabled:bg-gray-100 disabled:opacity-60 dark:border-gray-700 dark:bg-gray-900 dark:text-white"
-                >
-                  <option value="">
-                    {isLoadingLessons ? 'Đang tải bài học...' : selectedTopicId ? '(Gán theo Topic chung)' : '-- Chọn Chủ đề trước --'}
-                  </option>
-                  {lessons.map((l) => (
-                    <option key={l.id} value={l.id}>
-                      {l.name}
-                    </option>
-                  ))}
-                </select>
-              </div>
             </div>
 
-            {/* Level & Quantity */}
-            <div className="grid gap-4 sm:grid-cols-2">
+            <div className="grid gap-4 sm:grid-cols-3">
               <div>
                 <label className="block text-xs font-black uppercase text-gray-700 dark:text-gray-300 mb-1">
-                  Trình độ (Level)
+                  Trình độ lấy từ Course
                 </label>
-                <select
-                  value={vocabLevel}
-                  onChange={(e: any) => setVocabLevel(e.target.value)}
-                  className="w-full rounded-xl border border-gray-300 bg-white p-2.5 text-xs font-bold text-gray-800 outline-none focus:border-emerald-500 dark:border-gray-700 dark:bg-gray-900 dark:text-white"
-                >
-                  <option value="A1">Level A1 (Dễ)</option>
-                  <option value="A2">Level A2 (Cơ bản)</option>
-                  <option value="B1">Level B1 (Trung bình)</option>
-                  <option value="B2">Level B2 (Khá)</option>
-                  <option value="C1">Level C1 (Nâng cao)</option>
-                  <option value="C2">Level C2 (Thành thạo)</option>
-                </select>
+                <div className="rounded-xl border border-gray-200 bg-gray-100 p-2.5 text-xs font-black text-gray-700 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-200">
+                  {courses.find((course) => course.id === selectedCourseId)?.level || 'Chưa chọn Course'}
+                </div>
               </div>
 
               <div>
@@ -791,11 +1169,32 @@ export default function AdminAIContentPage() {
                 <input
                   type="number"
                   min={1}
-                  max={50}
+                  max={20}
                   value={vocabQuantity}
-                  onChange={(e) => setVocabQuantity(Math.max(1, Math.min(50, Number(e.target.value))))}
+                  onChange={(event) =>
+                    setVocabQuantity(
+                      Math.max(1, Math.min(20, Number(event.target.value) || 1)),
+                    )
+                  }
                   className="w-full rounded-xl border border-gray-300 bg-white p-2.5 text-xs font-bold text-gray-800 outline-none focus:border-emerald-500 dark:border-gray-700 dark:bg-gray-900 dark:text-white"
                 />
+              </div>
+
+              <div>
+                <label className="block text-xs font-black uppercase text-gray-700 dark:text-gray-300 mb-1">
+                  Yêu cầu bổ sung
+                </label>
+                <textarea
+                  value={vocabRequirements}
+                  maxLength={500}
+                  rows={2}
+                  placeholder="Ví dụ: Ưu tiên từ thông dụng trong giao tiếp"
+                  onChange={(event) => setVocabRequirements(event.target.value)}
+                  className="w-full rounded-xl border border-gray-300 bg-white p-2.5 text-xs font-bold text-gray-800 outline-none focus:border-emerald-500 dark:border-gray-700 dark:bg-gray-900 dark:text-white"
+                />
+                <span className="text-[10px] font-semibold text-gray-400">
+                  {vocabRequirements.length}/500
+                </span>
               </div>
             </div>
 
@@ -811,69 +1210,68 @@ export default function AdminAIContentPage() {
               )}
               <button
                 type="submit"
-                disabled={isGeneratingVocab}
+                disabled={isGeneratingVocab || isCommittingVocab}
                 className="flex items-center gap-2 rounded-xl bg-emerald-600 px-6 py-2.5 text-xs font-black uppercase text-white shadow-md hover:bg-emerald-700 disabled:opacity-50 transition-all cursor-pointer"
               >
                 {isGeneratingVocab ? (
                   <>
                     <div className="h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent" />
-                    <span>AI Đang Tạo Từ Vựng...</span>
+                    <span>AI đang tạo đề xuất...</span>
                   </>
                 ) : (
                   <>
-                    <span>AI Tạo Đúng {vocabQuantity} Từ Vựng Mới</span>
+                    <span>Tạo {vocabQuantity} từ bằng AI</span>
                   </>
                 )}
               </button>
             </div>
           </form>
 
+          <AiVocabularyPreview
+            candidates={vocabularyCandidates}
+            selectedKeys={selectedCandidateKeys}
+            generationStatus={vocabularyGenerationStatus}
+            isCommitting={isCommittingVocab}
+            onCandidatesChange={setVocabularyCandidates}
+            onSelectedKeysChange={setSelectedCandidateKeys}
+            onCommit={handleCommitVocabularies}
+          />
+
+          <div className="flex flex-wrap gap-2 text-[11px] font-black uppercase">
+            <span className="rounded-full bg-amber-100 px-3 py-1 text-amber-800">
+              Đề xuất AI chưa lưu
+            </span>
+            <span className="rounded-full bg-sky-100 px-3 py-1 text-sky-800">
+              Vocabulary DRAFT đã lưu
+            </span>
+            <span className="rounded-full bg-emerald-100 px-3 py-1 text-emerald-800">
+              Vocabulary đã PUBLISHED
+            </span>
+          </div>
+
           {/* Draft Vocabs List with Multi-Select Controls */}
           <div className="space-y-4">
             <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-              {/* Filter Buttons */}
-              <div className="flex items-center gap-2">
-                <button
-                  type="button"
-                  onClick={() => {
-                    setViewFilter('NEWLY_GENERATED')
-                    setSelectedVocabIds([])
-                  }}
-                  className={`rounded-xl px-4 py-2 text-xs font-black transition-all ${
-                    viewFilter === 'NEWLY_GENERATED'
-                      ? 'bg-amber-500 text-white shadow-sm'
-                      : 'bg-gray-100 text-gray-700 hover:bg-gray-200 dark:bg-gray-800 dark:text-gray-300'
-                  }`}
-                >
-                  Vừa Sinh Ra ({newlyGeneratedVocabs.length})
-                </button>
-                <button
-                  type="button"
-                  onClick={() => {
-                    setViewFilter('ALL_DRAFTS')
-                    setSelectedVocabIds([])
-                  }}
-                  className={`rounded-xl px-4 py-2 text-xs font-black transition-all ${
-                    viewFilter === 'ALL_DRAFTS'
-                      ? 'bg-emerald-600 text-white shadow-sm'
-                      : 'bg-gray-100 text-gray-700 hover:bg-gray-200 dark:bg-gray-800 dark:text-gray-300'
-                  }`}
-                >
-                  Tất Cả Bản Nháp ({draftVocabs.length})
-                </button>
+              <div>
+                <h3 className="text-base font-black text-gray-900 dark:text-white">
+                  Vocabulary DRAFT đã lưu ({draftVocabs.length})
+                </h3>
+                <p className="text-xs font-semibold text-gray-500">
+                  Chỉ các record có ID trong database mới có thể sửa, xóa hoặc publish.
+                </p>
               </div>
 
               {/* Multi-Select Action Controls */}
-              {activeVocabsToShow.length > 0 && (
+              {draftVocabs.length > 0 && (
                 <div className="flex items-center gap-2">
                   <label className="flex cursor-pointer items-center gap-1.5 rounded-xl border border-gray-200 bg-white px-3 py-1.5 text-xs font-bold text-gray-700 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-300">
                     <input
                       type="checkbox"
-                      checked={activeVocabsToShow.length > 0 && selectedVocabIds.length === activeVocabsToShow.length}
+                      checked={draftVocabs.length > 0 && selectedVocabIds.length === draftVocabs.length}
                       onChange={toggleSelectAllVocabs}
                       className="accent-emerald-600 h-4 w-4"
                     />
-                    <span>Chọn tất cả ({selectedVocabIds.length}/{activeVocabsToShow.length})</span>
+                    <span>Chọn tất cả ({selectedVocabIds.length}/{draftVocabs.length})</span>
                   </label>
 
                   {selectedVocabIds.length > 0 && (
@@ -891,7 +1289,7 @@ export default function AdminAIContentPage() {
                     onClick={handleBulkPublishVocabs}
                     className="rounded-xl bg-emerald-600 px-4 py-1.5 text-xs font-black uppercase text-white shadow-sm hover:bg-emerald-700"
                   >
-                    Duyệt {selectedVocabIds.length > 0 ? `đã chọn (${selectedVocabIds.length})` : `tất cả (${activeVocabsToShow.length})`}
+                    Publish {selectedVocabIds.length > 0 ? `đã chọn (${selectedVocabIds.length})` : `tất cả (${draftVocabs.length})`}
                   </button>
                 </div>
               )}
@@ -901,15 +1299,13 @@ export default function AdminAIContentPage() {
               <div className="py-8 text-center">
                 <div className="mx-auto h-6 w-6 animate-spin rounded-full border-2 border-emerald-500 border-t-transparent" />
               </div>
-            ) : activeVocabsToShow.length === 0 ? (
+            ) : draftVocabs.length === 0 ? (
               <div className="rounded-2xl border-2 border-dashed border-gray-200 p-8 text-center text-xs font-bold text-gray-500 dark:border-gray-800">
-                {viewFilter === 'NEWLY_GENERATED'
-                  ? 'Chưa có từ vựng nào vừa sinh ra. Hãy chọn Khóa học ➔ Phần học ➔ Chủ đề và bấm "AI Tạo Từ Vựng Mới".'
-                  : 'Chưa có từ vựng nháp nào trong bài này.'}
+                Chưa có Vocabulary DRAFT nào đã lưu trong chủ đề này.
               </div>
             ) : (
               <div className="grid gap-3 sm:grid-cols-2">
-                {activeVocabsToShow.map((v) => {
+                {draftVocabs.map((v) => {
                   const isChecked = selectedVocabIds.includes(v.id)
                   return (
                     <div
@@ -921,19 +1317,13 @@ export default function AdminAIContentPage() {
                       }`}
                     >
                       <div>
-                        {/* 4-Step Location Breadcrumb Tag */}
+                        {/* Saved Vocabulary location */}
                         <div className="mb-2 flex flex-wrap items-center gap-1 text-[10px] font-bold text-gray-500 bg-amber-100/80 dark:bg-gray-800 px-2.5 py-1 rounded-xl">
                           <span className="text-emerald-700 dark:text-emerald-400">📚 {courses.find((c) => c.id === selectedCourseId)?.name || 'Khóa học'}</span>
                           <span>➔</span>
                           <span className="text-purple-700 dark:text-purple-400">📑 {sections.find((s) => s.id === selectedSectionId)?.name || 'Phần học'}</span>
                           <span>➔</span>
                           <span className="text-amber-700 dark:text-amber-400">📂 {topics.find((t) => t.id === selectedTopicId)?.name || 'Chủ đề'}</span>
-                          {selectedLessonId && (
-                            <>
-                              <span>➔</span>
-                              <span className="text-cyan-700 dark:text-cyan-400">📖 {lessons.find((l) => l.id === selectedLessonId)?.name || 'Bài học'}</span>
-                            </>
-                          )}
                         </div>
 
                         <div className="flex items-start justify-between gap-2">
@@ -956,8 +1346,8 @@ export default function AdminAIContentPage() {
                               {v.phonetic && <span className="text-xs text-emerald-600 font-bold">{v.phonetic}</span>}
                             </div>
                           </div>
-                          <span className="rounded-lg bg-amber-200 px-2 py-0.5 text-[10px] font-black uppercase text-amber-800 dark:bg-amber-950 dark:text-amber-300">
-                            DRAFT
+                          <span className="rounded-lg bg-sky-100 px-2 py-0.5 text-[10px] font-black uppercase text-sky-800 dark:bg-sky-950 dark:text-sky-300">
+                            Vocabulary DRAFT đã lưu
                           </span>
                         </div>
                         <p className="mt-2 text-sm font-bold text-gray-800 dark:text-gray-200">{v.meaning}</p>
@@ -985,7 +1375,7 @@ export default function AdminAIContentPage() {
                           onClick={() => handlePublishVocab(v.id)}
                           className="rounded-lg bg-emerald-600 px-2.5 py-1 text-[11px] font-black text-white hover:bg-emerald-700"
                         >
-                          Approve
+                          Publish
                         </button>
                         <button
                           type="button"
@@ -1012,7 +1402,7 @@ export default function AdminAIContentPage() {
             className="rounded-3xl border-2 border-gray-200 bg-white p-6 shadow-sm dark:border-gray-800 dark:bg-gray-900 space-y-4"
           >
             <h2 className="text-base font-black text-gray-900 dark:text-white">
-              Chọn Đủ 4 Bước Tuần Tự (Course ➔ Section ➔ Topic ➔ Lesson)
+              Chọn Course ➔ Section ➔ Topic để tạo đề xuất câu hỏi
             </h2>
 
             {/* 3 Main Cascade Steps: Course -> Section -> Topic */}
@@ -1081,17 +1471,33 @@ export default function AdminAIContentPage() {
             {/* Sibling Level under Topic: Lesson & Vocabulary */}
             <div className="grid gap-4 sm:grid-cols-2 pt-2 border-t border-gray-200 dark:border-gray-800">
               <div>
-                <label className="block text-xs font-black uppercase text-cyan-700 dark:text-cyan-400 mb-1">
-                  📖 Bài học thuộc Chủ đề (Tùy chọn gán câu hỏi)
-                </label>
-                <select
-                  disabled={!selectedTopicId || isLoadingLessons}
+                  <div className="mb-1 flex items-center justify-between gap-2">
+                    <label className="block text-xs font-black uppercase text-cyan-700 dark:text-cyan-400">
+                      📖 Lesson ngữ cảnh/đích gán (không bắt buộc)
+                    </label>
+                    {selectedTopicId && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setLessonFormError(null)
+                          setErrorMessage(null)
+                          setIsLessonFormOpen(true)
+                        }}
+                        disabled={isCreatingLesson || isAssigningQuestions}
+                        className="text-[11px] font-bold text-cyan-600 hover:underline disabled:opacity-50 dark:text-cyan-400"
+                      >
+                        + Tạo bài học mới
+                      </button>
+                    )}
+                  </div>
+                  <select
+                  disabled={!selectedTopicId || isLoadingLessons || isCommittingQuestion}
                   value={selectedLessonId}
-                  onChange={(e) => setSelectedLessonId(e.target.value)}
+                  onChange={(e) => handleLessonSelection(e.target.value)}
                   className="w-full rounded-xl border border-gray-300 bg-white p-2.5 text-xs font-bold text-gray-800 outline-none focus:border-cyan-500 disabled:bg-gray-100 disabled:opacity-60 dark:border-gray-700 dark:bg-gray-900 dark:text-white"
                 >
                   <option value="">
-                    {isLoadingLessons ? 'Đang tải bài học...' : selectedTopicId ? '(Tất cả các bài học trong chủ đề)' : '-- Chọn Chủ đề trước --'}
+                    {isLoadingLessons ? 'Đang tải bài học...' : selectedTopicId ? '-- Chọn Lesson để gán câu hỏi --' : '-- Chọn Chủ đề trước --'}
                   </option>
                   {lessons.map((l) => (
                     <option key={l.id} value={l.id}>
@@ -1099,6 +1505,14 @@ export default function AdminAIContentPage() {
                     </option>
                   ))}
                 </select>
+                {selectedTopicId && lessons.length === 0 && !isLoadingLessons && (
+                  <p className="mt-1 text-xs font-semibold text-amber-600 dark:text-amber-400">
+                    Topic chưa có Lesson. Hãy tạo Lesson mới để gán câu hỏi.
+                  </p>
+                )}
+                <p className="mt-1 text-[11px] font-semibold text-gray-500 dark:text-gray-400">
+                  Nếu chọn Lesson, sau khi commit thành DRAFT hệ thống sẽ tự gán các Question vừa lưu vào Lesson đó.
+                </p>
               </div>
 
               <div>
@@ -1110,7 +1524,7 @@ export default function AdminAIContentPage() {
                     <button
                       type="button"
                       onClick={() => {
-                        const allIds = vocabularies.map((v) => v.id || v._id)
+                        const allIds = vocabularies.map((v) => v.id)
                         if (selectedTargetVocabIds.length === vocabularies.length) {
                           setSelectedTargetVocabIds([])
                         } else {
@@ -1135,7 +1549,7 @@ export default function AdminAIContentPage() {
                 ) : (
                   <div className="max-h-36 overflow-y-auto flex flex-wrap gap-1.5 rounded-xl border border-gray-300 bg-white p-2.5 dark:border-gray-700 dark:bg-gray-900">
                     {vocabularies.map((v) => {
-                      const vId = v.id || v._id
+                      const vId = v.id
                       const isSelected = selectedTargetVocabIds.includes(vId)
                       return (
                         <button
@@ -1169,13 +1583,12 @@ export default function AdminAIContentPage() {
                   Loại câu hỏi:
                 </label>
                 <div className="flex flex-wrap items-center gap-2">
-                  {[
+                  {([
                     { id: 'MULTIPLE_CHOICE', label: 'Trắc nghiệm' },
-                    { id: 'FILL_IN_BLANK', label: 'Điền từ' },
-                    { id: 'TRANSLATION', label: 'Dịch câu' },
+                    { id: 'FILL_BLANK', label: 'Điền từ' },
                     { id: 'MATCHING', label: 'Nối từ' },
-                    { id: 'REORDER', label: 'Sắp xếp' },
-                  ].map((t) => (
+                    { id: 'ORDER_SENTENCE', label: 'Sắp xếp câu' },
+                  ] satisfies ReadonlyArray<{ id: AiSupportedQuestionType; label: string }>).map((t) => (
                     <label
                       key={t.id}
                       className={`flex cursor-pointer items-center gap-1.5 rounded-xl border px-3 py-1.5 text-xs font-bold transition-all ${
@@ -1207,7 +1620,11 @@ export default function AdminAIContentPage() {
                   </label>
                   <select
                     value={questionDifficulty}
-                    onChange={(e: any) => setQuestionDifficulty(e.target.value)}
+                    onChange={(event) =>
+                      setQuestionDifficulty(
+                        event.target.value as 'EASY' | 'MEDIUM' | 'HARD',
+                      )
+                    }
                     className="w-full rounded-xl border border-gray-300 bg-white p-2.5 text-xs font-bold text-gray-800 outline-none focus:border-cyan-500 dark:border-gray-700 dark:bg-gray-900 dark:text-white"
                   >
                     <option value="EASY">Dễ (EASY)</option>
@@ -1231,6 +1648,23 @@ export default function AdminAIContentPage() {
               </div>
             </div>
 
+            <div>
+              <label className="mb-1 block text-xs font-black uppercase text-gray-700 dark:text-gray-300">
+                Yêu cầu bổ sung (không bắt buộc)
+              </label>
+              <textarea
+                value={questionRequirements}
+                onChange={(event) => setQuestionRequirements(event.target.value.slice(0, 500))}
+                maxLength={500}
+                rows={3}
+                placeholder="Ví dụ: dùng ngữ cảnh giao tiếp hằng ngày, câu ngắn và rõ ràng..."
+                className="w-full rounded-xl border border-gray-300 bg-white p-3 text-xs font-semibold text-gray-800 outline-none focus:border-cyan-500 dark:border-gray-700 dark:bg-gray-900 dark:text-white"
+              />
+              <p className="mt-1 text-right text-[10px] font-semibold text-gray-400">
+                {questionRequirements.length}/500
+              </p>
+            </div>
+
             <div className="flex justify-end items-center gap-3 pt-2">
               {isGeneratingQuestion && (
                 <button
@@ -1243,7 +1677,7 @@ export default function AdminAIContentPage() {
               )}
               <button
                 type="submit"
-                disabled={isGeneratingQuestion}
+                disabled={isGeneratingQuestion || isCommittingQuestion}
                 className="flex items-center gap-2 rounded-xl bg-cyan-600 px-6 py-2.5 text-xs font-black uppercase text-white shadow-md hover:bg-cyan-700 disabled:opacity-50 transition-all cursor-pointer"
               >
                 {isGeneratingQuestion ? (
@@ -1253,15 +1687,34 @@ export default function AdminAIContentPage() {
                   </>
                 ) : (
                   <>
-                    <span>AI Tạo Đúng {questionQuantity} Câu Hỏi Mới</span>
+                    <span>AI Tạo {questionQuantity} Đề Xuất Câu Hỏi</span>
                   </>
                 )}
               </button>
             </div>
           </form>
 
+          {questionGenerationId && questionGenerationStatus && (
+            <AiQuestionPreview
+              candidates={questionCandidates}
+              vocabularies={vocabularies.map(({ id, word }) => ({ id, word }))}
+              selectedKeys={selectedQuestionCandidateKeys}
+              generationStatus={questionGenerationStatus}
+              isCommitting={isCommittingQuestion}
+              onCandidatesChange={setQuestionCandidates}
+              onSelectedKeysChange={setSelectedQuestionCandidateKeys}
+              onCommit={handleCommitQuestions}
+            />
+          )}
+
           {/* Draft Questions List with Multi-Select Controls */}
           <div className="space-y-4">
+            <div className="flex flex-wrap gap-2 text-[10px] font-black uppercase">
+              <span className="rounded-full bg-amber-100 px-2.5 py-1 text-amber-800">Đề xuất AI: chưa lưu</span>
+              <span className="rounded-full bg-slate-100 px-2.5 py-1 text-slate-700">DRAFT: đã lưu, chưa Publish</span>
+              <span className="rounded-full bg-indigo-100 px-2.5 py-1 text-indigo-700">Đã gán: thuộc Lesson đang chọn</span>
+              <span className="rounded-full bg-emerald-100 px-2.5 py-1 text-emerald-700">PUBLISHED: đã phát hành</span>
+            </div>
             <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
               {/* Filter Buttons */}
               <div className="flex items-center gap-2">
@@ -1277,7 +1730,7 @@ export default function AdminAIContentPage() {
                       : 'bg-gray-100 text-gray-700 hover:bg-gray-200 dark:bg-gray-800 dark:text-gray-300'
                   }`}
                 >
-                  Vừa Sinh Ra ({newlyGeneratedQuestions.length})
+                  Vừa Lưu DRAFT ({newlyGeneratedQuestions.length})
                 </button>
                 <button
                   type="button"
@@ -1297,7 +1750,7 @@ export default function AdminAIContentPage() {
 
               {/* Multi-Select Action Controls */}
               {activeQuestionsToShow.length > 0 && (
-                <div className="flex items-center gap-2">
+                <div className="flex flex-wrap items-center justify-end gap-2">
                   <label className="flex cursor-pointer items-center gap-1.5 rounded-xl border border-gray-200 bg-white px-3 py-1.5 text-xs font-bold text-gray-700 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-300">
                     <input
                       type="checkbox"
@@ -1307,6 +1760,17 @@ export default function AdminAIContentPage() {
                     />
                     <span>Chọn tất cả ({selectedQuestionIds.length}/{activeQuestionsToShow.length})</span>
                   </label>
+
+                  {selectedQuestionIds.length > 0 && (
+                    <button
+                      type="button"
+                      onClick={() => void handleAssignSelectedQuestions()}
+                      disabled={!selectedLessonId || isAssigningQuestions || isCreatingLesson}
+                      className="rounded-xl bg-indigo-600 px-4 py-1.5 text-xs font-black uppercase text-white shadow-sm hover:bg-indigo-700 disabled:cursor-not-allowed disabled:opacity-50"
+                    >
+                      {isAssigningQuestions ? 'Đang gán...' : `Gán vào Lesson (${selectedQuestionIds.length})`}
+                    </button>
+                  )}
 
                   {selectedQuestionIds.length > 0 && (
                     <button
@@ -1323,11 +1787,27 @@ export default function AdminAIContentPage() {
                     onClick={handleBulkPublishQuestions}
                     className="rounded-xl bg-cyan-600 px-4 py-1.5 text-xs font-black uppercase text-white shadow-sm hover:bg-cyan-700"
                   >
-                    Duyệt {selectedQuestionIds.length > 0 ? `đã chọn (${selectedQuestionIds.length})` : `tất cả (${activeQuestionsToShow.length})`}
+                    Publish {selectedQuestionIds.length > 0 ? `đã chọn (${selectedQuestionIds.length})` : `tất cả (${activeQuestionsToShow.length})`}
                   </button>
                 </div>
               )}
             </div>
+
+            {pendingQuestionAssignment?.lessonId && (
+              <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-xs font-semibold text-amber-800 dark:border-amber-900/50 dark:bg-amber-950/30 dark:text-amber-300">
+                <span>
+                  Lesson đã tạo nhưng còn {pendingQuestionAssignment.questionIds.length} câu hỏi chưa được gán. Lesson vẫn được giữ lại để tránh tạo trùng.
+                </span>
+                <button
+                  type="button"
+                  onClick={() => void retryPendingQuestionAssignment()}
+                  disabled={isAssigningQuestions}
+                  className="rounded-lg bg-amber-600 px-3 py-1.5 text-[11px] font-black text-white hover:bg-amber-700 disabled:opacity-50"
+                >
+                  {isAssigningQuestions ? 'Đang thử lại...' : 'Thử gán lại'}
+                </button>
+              </div>
+            )}
 
             {isLoadingDrafts ? (
               <div className="py-8 text-center">
@@ -1336,8 +1816,8 @@ export default function AdminAIContentPage() {
             ) : activeQuestionsToShow.length === 0 ? (
               <div className="rounded-2xl border-2 border-dashed border-gray-200 p-8 text-center text-xs font-bold text-gray-500 dark:border-gray-800">
                 {viewFilter === 'NEWLY_GENERATED'
-                  ? 'Chưa có câu hỏi nào vừa sinh ra. Hãy chọn Khóa học ➔ Phần học ➔ Chủ đề và bấm "AI Tạo Câu Hỏi Mới".'
-                  : 'Chưa có câu hỏi nháp nào trong bài này.'}
+                  ? 'Chưa có Question DRAFT nào vừa được lưu từ danh sách đề xuất AI.'
+                  : 'Chưa có Question DRAFT nào trong Topic này.'}
               </div>
             ) : (
               <div className="space-y-3">
@@ -1360,32 +1840,37 @@ export default function AdminAIContentPage() {
                           className="mt-1 h-4 w-4 accent-cyan-600 cursor-pointer"
                         />
                         <div className="space-y-1">
-                          {/* 4-Step Location Breadcrumb Tag */}
+                          {/* Question belongs to Topic; Lesson assignment is shown separately. */}
                           <div className="mb-1.5 inline-flex flex-wrap items-center gap-1 text-[10px] font-bold text-gray-500 bg-cyan-100/80 dark:bg-gray-800 px-2.5 py-0.5 rounded-xl">
                             <span className="text-emerald-700 dark:text-emerald-400">📚 {courses.find((c) => c.id === selectedCourseId)?.name || 'Khóa học'}</span>
                             <span>➔</span>
                             <span className="text-purple-700 dark:text-purple-400">📑 {sections.find((s) => s.id === selectedSectionId)?.name || 'Phần học'}</span>
                             <span>➔</span>
                             <span className="text-amber-700 dark:text-amber-400">📂 {topics.find((t) => t.id === selectedTopicId)?.name || 'Chủ đề'}</span>
-                            {selectedLessonId && (
-                              <>
-                                <span>➔</span>
-                                <span className="text-cyan-700 dark:text-cyan-400">📖 {lessons.find((l) => l.id === selectedLessonId)?.name || 'Bài học'}</span>
-                              </>
-                            )}
                           </div>
 
                           <div className="flex items-center gap-2">
                             <span className="rounded bg-cyan-100 px-2 py-0.5 text-[10px] font-black uppercase text-cyan-800 dark:bg-cyan-950 dark:text-cyan-300">
                               {q.type}
                             </span>
-                            <span className="rounded bg-purple-100 px-2 py-0.5 text-[10px] font-black uppercase text-purple-700 dark:bg-purple-950 dark:text-purple-300">
-                              AI GENERATED
-                            </span>
+                            {q.createdByAi && (
+                              <span className="rounded bg-purple-100 px-2 py-0.5 text-[10px] font-black uppercase text-purple-700 dark:bg-purple-950 dark:text-purple-300">
+                                AI GENERATED
+                              </span>
+                            )}
                             <span className="text-[10px] font-bold text-gray-400">Độ khó: {q.difficulty}</span>
+                            <span className={`rounded px-2 py-0.5 text-[10px] font-black uppercase ${
+                              assignedQuestionIds.includes(q.id)
+                                ? 'bg-indigo-100 text-indigo-700 dark:bg-indigo-950 dark:text-indigo-300'
+                                : 'bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-300'
+                            }`}>
+                              {assignedQuestionIds.includes(q.id)
+                                ? 'Đã gán vào Lesson đang chọn'
+                                : 'Chưa gán vào Lesson đang chọn'}
+                            </span>
                           </div>
                           <h4 className="text-sm font-black text-gray-900 dark:text-white">{q.content}</h4>
-                          {q.explanation && (
+                          {isQuestionDetail(q) && q.explanation && (
                             <p className="text-xs text-gray-500">💡 {q.explanation}</p>
                           )}
                         </div>
@@ -1395,7 +1880,7 @@ export default function AdminAIContentPage() {
                       <div className="flex items-center justify-end gap-1.5 self-end sm:self-center">
                         <button
                           type="button"
-                          onClick={() => setViewItem(q)}
+                          onClick={() => void openViewQuestion(q)}
                           className="rounded-lg bg-white px-2.5 py-1 text-[11px] font-bold text-gray-700 hover:bg-gray-100 border border-gray-200 dark:bg-gray-800 dark:text-gray-200"
                         >
                           Xem
@@ -1412,7 +1897,7 @@ export default function AdminAIContentPage() {
                           onClick={() => handlePublishQuestion(q.id)}
                           className="rounded-lg bg-emerald-600 px-2.5 py-1 text-[11px] font-black text-white hover:bg-emerald-700"
                         >
-                          Approve
+                          Publish
                         </button>
                         <button
                           type="button"
@@ -1437,7 +1922,7 @@ export default function AdminAIContentPage() {
           <div className="w-full max-w-lg rounded-3xl bg-white p-6 shadow-2xl dark:bg-gray-900 border-2 border-emerald-500/30 space-y-4">
             <div className="flex items-center justify-between border-b pb-3 dark:border-gray-800">
               <h3 className="text-base font-black text-gray-900 dark:text-white">
-                Preview Chi Tiết ({viewItem.word || viewItem.type})
+                Preview Chi Tiết ({'word' in viewItem ? viewItem.word : viewItem.type})
               </h3>
               <button
                 type="button"
@@ -1449,7 +1934,7 @@ export default function AdminAIContentPage() {
             </div>
 
             <div className="py-2 space-y-3">
-              {viewItem.word ? (
+              {'word' in viewItem ? (
                 <>
                   <div className="flex items-center gap-2">
                     <span className="text-2xl font-black text-emerald-600">{viewItem.word}</span>
@@ -1477,7 +1962,7 @@ export default function AdminAIContentPage() {
                     <div className="space-y-2">
                       <p className="text-xs font-bold text-gray-500">🧩 Các thẻ từ (Word Chips):</p>
                       <div className="flex flex-wrap gap-2">
-                        {viewItem.options.map((opt: any, idx: number) => (
+                        {viewItem.options.map((opt, idx) => (
                           <span
                             key={idx}
                             className="rounded-xl border border-emerald-500/30 bg-emerald-50 px-3 py-1.5 text-xs font-black text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300"
@@ -1490,7 +1975,7 @@ export default function AdminAIContentPage() {
                   ) : viewItem.options ? (
                     <div className="space-y-2">
                       <p className="text-xs font-bold text-gray-500">Các lựa chọn:</p>
-                      {viewItem.options.map((opt: any, idx: number) => (
+                      {viewItem.options.map((opt, idx) => (
                         <div
                           key={idx}
                           className={`rounded-xl p-2.5 text-xs font-bold border ${
@@ -1512,7 +1997,7 @@ export default function AdminAIContentPage() {
                   {viewItem.matchingPairs && (
                     <div className="space-y-1 rounded-xl bg-gray-50 p-3 text-xs dark:bg-gray-800">
                       <p className="font-bold text-gray-700 dark:text-gray-300">Cặp từ ghép nối:</p>
-                      {viewItem.matchingPairs.map((p: any, idx: number) => (
+                      {viewItem.matchingPairs.map((p, idx) => (
                         <div key={idx} className="flex items-center gap-2 font-semibold text-emerald-600">
                           <span>{p.leftValue}</span> ➔ <span>{p.rightValue}</span>
                         </div>
@@ -1549,6 +2034,22 @@ export default function AdminAIContentPage() {
         onClose={() => {
           setIsVocabFormOpen(false)
           setSelectedVocabForModal(null)
+        }}
+      />
+
+      <LessonFormModal
+        isOpen={isLessonFormOpen}
+        assignmentMode
+        nextOrderIndex={lessons.reduce((max, lesson) => Math.max(max, lesson.orderIndex), -1) + 1}
+        isLoading={isCreatingLesson}
+        serverNameError={null}
+        serverError={lessonFormError}
+        onSubmit={handleCreateLessonForAssignment}
+        onClose={() => {
+          if (!isCreatingLesson) {
+            setIsLessonFormOpen(false)
+            setLessonFormError(null)
+          }
         }}
       />
 

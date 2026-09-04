@@ -234,13 +234,13 @@ export default function AdminLessonDetailPage() {
         buildQuestionFormData(values),
         setQuestionUploadProgress,
       )
-      const updatedList = await adminQuestionService.assignQuestionsToLesson(
+      const assignResult = await adminQuestionService.assignQuestionsToLessonWithResult(
         lessonId,
-        [createdQuestion.id],
+        { questionIds: [createdQuestion.id] },
       )
-      setLessonQuestions(updatedList)
+      setLessonQuestions(assignResult.questions)
       setLesson((prev) =>
-        prev ? { ...prev, questionCount: updatedList.length } : prev,
+        prev ? assignResult.lesson : prev,
       )
       showNotification('success', 'Đã tạo và gán câu hỏi mới vào bài học.')
       setIsCreateQuestionModalOpen(false)
@@ -287,17 +287,19 @@ export default function AdminLessonDetailPage() {
     if (!lessonId || selectedQuestionIds.length === 0) return
     setIsSubmitting(true)
     try {
-      const updatedList = await adminQuestionService.assignQuestionsToLesson(
+      const assignResult = await adminQuestionService.assignQuestionsToLessonWithResult(
         lessonId,
-        selectedQuestionIds,
+        { questionIds: selectedQuestionIds },
       )
-      setLessonQuestions(updatedList)
+      setLessonQuestions(assignResult.questions)
       setLesson((prev) =>
-        prev ? { ...prev, questionCount: updatedList.length } : prev,
+        prev ? assignResult.lesson : prev,
       )
       showNotification(
         'success',
-        `Đã gán ${selectedQuestionIds.length} câu hỏi vào bài học.`,
+        assignResult.skippedCount > 0
+          ? `Đã gán ${assignResult.assignedCount} câu hỏi; bỏ qua ${assignResult.skippedCount} câu đã có.`
+          : `Đã gán ${assignResult.assignedCount} câu hỏi vào bài học.`,
       )
       setIsAssignModalOpen(false)
     } catch (err: unknown) {

@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { useLearnedVocabularies, useExcludeFromReview } from '../../hooks/useLearnedVocabulary'
+import { useLearnedVocabularies } from '../../hooks/useLearnedVocabulary'
 import { useReviewSession, useSubmitReviewResults, useReviewStats } from '../../hooks/useVocabularyReview'
 
 export default function UserLearnedVocabularyPage() {
