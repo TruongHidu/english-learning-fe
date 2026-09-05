@@ -11,6 +11,7 @@ import {
 } from '../utils/auth-storage'
 import { AuthContext } from './auth-context'
 import type { AuthUserCachePatch } from './auth-context'
+import { queryClient } from '../lib/queryClient'
 
 interface AuthProviderProps {
   children: ReactNode
@@ -110,6 +111,14 @@ export function AuthProvider({ children }: AuthProviderProps) {
               },
             })
             window.dispatchEvent(new CustomEvent('DIAMOND_UPDATED', { detail: payload }))
+          } else if (payload?.type === 'DIAMOND_PACKAGE_UPDATED') {
+            void queryClient.invalidateQueries({ queryKey: ['shop'] })
+            void queryClient.invalidateQueries({ queryKey: ['admin-diamond-packages'] })
+            try {
+              bc?.postMessage(payload)
+            } catch {
+              // ignore
+            }
           }
         } catch {
           // ignore keep-alive or JSON parse errors
@@ -135,6 +144,10 @@ export function AuthProvider({ children }: AuthProviderProps) {
               })
               window.dispatchEvent(new CustomEvent('DIAMOND_UPDATED', { detail: payload }))
             }
+          } else if (payload?.type === 'DIAMOND_PACKAGE_UPDATED') {
+            void queryClient.invalidateQueries({ queryKey: ['shop'] })
+            void queryClient.invalidateQueries({ queryKey: ['admin-diamond-packages'] })
+            // Anti-loop: strictly DO NOT post back to BroadcastChannel
           }
         }
       } catch {
@@ -146,7 +159,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
       es?.close()
       bc?.close()
     }
-  }, [accessToken, user?.id, updateCachedUser])
+  }, [accessToken, user, updateCachedUser])
 
   const login = useCallback(async (input: LoginRequest): Promise<AuthUser> => {
     const response = await authService.login(input)

@@ -1,10 +1,16 @@
 import { useCallback, useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
+import { useQuery } from '@tanstack/react-query'
 import { useAuth } from '../../hooks/useAuth'
+import { queryClient } from '../../lib/queryClient'
 import { shopService } from '../../services/shop.service'
 import type { ShopData, ShopItem } from '../../types/shop.types'
 import { getShopErrorMessage } from '../../utils/shop-errors'
 import './ShopPage.css'
+
+function formatVnd(amount: number): string {
+  return new Intl.NumberFormat('vi-VN').format(amount) + ' ₫'
+}
 
 /* ==========================================================================
    SVG Vector Illustrations
@@ -186,12 +192,46 @@ export default function ShopPage() {
   const navigate = useNavigate()
   const { user, updateCachedUser } = useAuth()
   const [shop, setShop] = useState<ShopData | null>(null)
-  const [loading, setLoading] = useState(true)
   const [loadError, setLoadError] = useState('')
   const [purchaseError, setPurchaseError] = useState('')
   const [notice, setNotice] = useState('')
   const [buying, setBuying] = useState(false)
   const [now, setNow] = useState(() => Date.now())
+
+  // Use React Query for GET /shop
+  const {
+    data: shopData,
+    isLoading: isShopLoading,
+    error: shopQueryError,
+    refetch: refetchShop,
+  } = useQuery({
+    queryKey: ['shop'],
+    queryFn: shopService.getShop,
+  })
+
+  useEffect(() => {
+    if (shopData) {
+      setShop(shopData)
+      updateCachedUser({
+        stats: {
+          diamond: shopData.user.diamond,
+          currentHeart: shopData.user.currentHeart,
+          maxHeart: shopData.user.maxHeart,
+          nextHeartAt: shopData.user.nextHeartAt,
+        },
+      })
+    }
+  }, [shopData, updateCachedUser])
+
+  useEffect(() => {
+    if (shopQueryError) {
+      setLoadError(getShopErrorMessage(shopQueryError))
+    } else {
+      setLoadError('')
+    }
+  }, [shopQueryError])
+
+  const loading = isShopLoading && !shop
 
   // Listen for real-time diamond updates from admin
   useEffect(() => {
@@ -202,7 +242,7 @@ export default function ShopPage() {
           if (!prev) return prev
           const newDiamond = Number(detail.diamond)
           const full = prev.user.currentHeart >= prev.user.maxHeart
-          return {
+          const updated: ShopData = {
             ...prev,
             user: {
               ...prev.user,
@@ -219,6 +259,8 @@ export default function ShopPage() {
               return item
             }),
           }
+          queryClient.setQueryData(['shop'], updated)
+          return updated
         })
       }
     }
@@ -232,31 +274,14 @@ export default function ShopPage() {
   const [isSuperModalOpen, setIsSuperModalOpen] = useState(false)
   const [isInsufficientModalOpen, setIsInsufficientModalOpen] = useState(false)
 
-  // 1. Fetch shop data on mount (clean lifecycle without strict-mode bugs)
   const loadShop = useCallback(async () => {
-    setLoading(true)
     setLoadError('')
     try {
-      const data = await shopService.getShop()
-      setShop(data)
-      updateCachedUser({
-        stats: {
-          diamond: data.user.diamond,
-          currentHeart: data.user.currentHeart,
-          maxHeart: data.user.maxHeart,
-          nextHeartAt: data.user.nextHeartAt,
-        },
-      })
+      await refetchShop()
     } catch (error) {
       setLoadError(getShopErrorMessage(error))
-    } finally {
-      setLoading(false)
     }
-  }, [updateCachedUser])
-
-  useEffect(() => {
-    void loadShop()
-  }, [loadShop])
+  }, [refetchShop])
 
   // 2. Countdown timer for heart regeneration
   useEffect(() => {
@@ -314,7 +339,7 @@ export default function ShopPage() {
         const nextMaxHeart = result.hearts.max
         const nextDiamonds = result.diamond.after
 
-        return {
+        const updatedShop: ShopData = {
           ...current,
           user: {
             ...current.user,
@@ -337,6 +362,8 @@ export default function ShopPage() {
             }
           }),
         }
+        queryClient.setQueryData(['shop'], updatedShop)
+        return updatedShop
       })
 
       // 2. Sync with global auth state to update navbar instantly
@@ -596,40 +623,48 @@ export default function ShopPage() {
           </div>
 
           <div className="shop-gem-grid">
-            <div className="shop-gem-card">
-              <div className="shop-gem-icon">
-                <GemChestIllustration />
-              </div>
-              <div className="shop-gem-amount">100 💎</div>
-              <div className="shop-gem-name">Túi Đá Quý</div>
-              <button type="button" className="shop-gem-btn" disabled>
-                SẮP RA MẮT
-              </button>
-            </div>
-
-            <div className="shop-gem-card">
-              <span className="shop-gem-badge">PHỔ BIẾN NHẤT</span>
-              <div className="shop-gem-icon">
-                <GemChestIllustration />
-              </div>
-              <div className="shop-gem-amount">500 💎</div>
-              <div className="shop-gem-name">Rương Bạc</div>
-              <button type="button" className="shop-gem-btn" disabled>
-                SẮP RA MẮT
-              </button>
-            </div>
-
-            <div className="shop-gem-card">
-              <span className="shop-gem-badge">GIÁ TỐT NHẤT</span>
-              <div className="shop-gem-icon">
-                <GemChestIllustration />
-              </div>
-              <div className="shop-gem-amount">1,200 💎</div>
-              <div className="shop-gem-name">Kho Báu Hoàng Gia</div>
-              <button type="button" className="shop-gem-btn" disabled>
-                SẮP RA MẮT
-              </button>
-            </div>
+            {shop?.diamondPackages && shop.diamondPackages.length > 0 ? (
+              shop.diamondPackages.map((pkg) => (
+                <div className="shop-gem-card" key={pkg.id}>
+                  {pkg.orderIndex === 2 && (
+                    <span className="shop-gem-badge">PHỔ BIẾN NHẤT</span>
+                  )}
+                  {pkg.orderIndex === 3 && (
+                    <span className="shop-gem-badge">GIÁ TỐT NHẤT</span>
+                  )}
+                  <div className="shop-gem-icon">
+                    <GemChestIllustration />
+                  </div>
+                  <div className="shop-gem-amount">{pkg.diamondAmount.toLocaleString('vi-VN')} 💎</div>
+                  {pkg.bonusDiamond > 0 && (
+                    <div style={{ fontSize: 12, fontWeight: 700, color: '#16a34a', margin: '2px 0 4px' }}>
+                      +{pkg.bonusDiamond.toLocaleString('vi-VN')} 💎 thưởng
+                    </div>
+                  )}
+                  <div style={{ fontSize: 12, color: '#64748b', fontWeight: 600, marginBottom: 4 }}>
+                    Tổng: {pkg.totalDiamond.toLocaleString('vi-VN')} 💎
+                  </div>
+                  <div className="shop-gem-name">{pkg.name}</div>
+                  <div style={{ fontSize: 14, fontWeight: 800, color: '#334155', margin: '4px 0 10px' }}>
+                    {formatVnd(pkg.price)}
+                  </div>
+                  {pkg.description ? (
+                    <p style={{ fontSize: 11, color: '#94a3b8', margin: '0 0 12px', lineHeight: 1.3, minHeight: 28 }}>
+                      {pkg.description}
+                    </p>
+                  ) : (
+                    <div style={{ minHeight: 28 }} />
+                  )}
+                  <button type="button" className="shop-gem-btn" disabled>
+                    CHƯA HỖ TRỢ THANH TOÁN
+                  </button>
+                </div>
+              ))
+            ) : !loading ? (
+              <p style={{ gridColumn: '1 / -1', textAlign: 'center', color: '#64748b', padding: '24px 0' }}>
+                Hiện chưa có gói đá quý nào được mở bán.
+              </p>
+            ) : null}
           </div>
         </section>
       </main>
