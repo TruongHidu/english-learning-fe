@@ -1,3 +1,4 @@
+import type { LessonResponse } from './lesson.types'
 import type { VocabularyDifficulty } from './vocabulary.types'
 
 export type QuestionType =
@@ -168,6 +169,29 @@ export interface GetLessonQuestionsResponse {
   data: {
     questions: LessonQuestionResponse[]
   }
+}
+
+export interface AssignQuestionsToLessonRequest {
+  questionIds: string[]
+}
+
+export interface AssignQuestionsToLessonResponseData {
+  lesson: LessonResponse
+  questions: LessonQuestionResponse[]
+  assignedCount: number
+  skippedCount: number
+}
+
+export interface AssignQuestionsToLessonResponse {
+  success: true
+  message: string
+  data: AssignQuestionsToLessonResponseData
+}
+
+export interface PendingQuestionAssignment {
+  topicId: string
+  questionIds: string[]
+  lessonId: string | null
 }
 
 export interface EmptyQuestionResponse {

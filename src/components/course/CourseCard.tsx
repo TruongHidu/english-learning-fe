@@ -7,18 +7,18 @@ interface CourseCardProps {
 
 export default function CourseCard({ course, onSelect }: CourseCardProps) {
   return (
-    <article className="group bg-white rounded-2xl p-5 border-2 border-slate-200 hover:border-emerald-400 shadow-[0_4px_0_#e2e8f0] hover:shadow-[0_4px_0_#10b981] transition-all flex flex-col justify-between">
+    <article className="learning-surface learning-surface--raised group rounded-2xl p-5 border-2 hover:border-emerald-400 hover:shadow-[0_4px_0_#10b981] transition-all flex flex-col justify-between">
       <div>
         <div className="flex items-start justify-between gap-3 mb-3">
           <span className="inline-flex items-center px-2.5 py-1 rounded-xl text-xs font-black bg-emerald-100 text-emerald-800 tracking-wider">
             {course.level}
           </span>
-          <span className="text-xs font-bold text-slate-400">
+          <span className="learning-subtle-color text-xs font-bold">
             Khóa #{course.orderIndex}
           </span>
         </div>
 
-        <div className="w-full h-36 rounded-xl bg-slate-100 mb-4 overflow-hidden flex items-center justify-center border border-slate-200/60">
+        <div className="learning-surface--soft w-full h-36 rounded-xl mb-4 overflow-hidden flex items-center justify-center border">
           {course.thumbnailUrl ? (
             <img
               src={course.thumbnailUrl}
@@ -30,25 +30,25 @@ export default function CourseCard({ course, onSelect }: CourseCardProps) {
               }}
             />
           ) : (
-            <div className="text-center p-4 text-slate-400">
+            <div className="learning-subtle-color text-center p-4">
               <span className="text-4xl block mb-1">🎓</span>
-              <span className="text-xs font-bold uppercase tracking-wider text-slate-500">
+              <span className="learning-muted-color text-xs font-bold uppercase tracking-wider">
                 {course.level}
               </span>
             </div>
           )}
         </div>
 
-        <h3 className="text-lg font-extrabold text-slate-800 group-hover:text-emerald-600 transition-colors mb-1.5 line-clamp-1">
+        <h3 className="learning-heading-color text-lg font-extrabold group-hover:text-emerald-600 transition-colors mb-1.5 line-clamp-1">
           {course.name}
         </h3>
 
         {course.description ? (
-          <p className="text-sm text-slate-600 leading-relaxed line-clamp-2 mb-4">
+          <p className="learning-muted-color text-sm leading-relaxed line-clamp-2 mb-4">
             {course.description}
           </p>
         ) : (
-          <p className="text-sm text-slate-400 italic mb-4">Chưa có mô tả chi tiết.</p>
+          <p className="learning-subtle-color text-sm italic mb-4">Chưa có mô tả chi tiết.</p>
         )}
       </div>
 

@@ -39,3 +39,9 @@ export interface UpdateLessonInput {
 export type GetAdminLessonResponse = ApiSuccess<{ lesson: LessonResponse }>
 export type GetAdminLessonsByTopicResponse = ApiSuccess<{ lessons: LessonResponse[] }>
 export type EmptyLessonMutationResponse = ApiSuccess<null>
+
+export interface CreateLessonForAssignmentState {
+  isOpen: boolean
+  isSubmitting: boolean
+  error: string | null
+}

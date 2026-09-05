@@ -2,8 +2,10 @@ import { createContext } from 'react'
 import type { AuthUser, LoginRequest } from '../types/auth.types'
 
 export type AuthUserCachePatch = Partial<
-  Pick<AuthUser, 'displayName' | 'avatarUrl' | 'role' | 'stats'>
->
+  Pick<AuthUser, 'displayName' | 'avatarUrl' | 'role'>
+> & {
+  stats?: Partial<AuthUser['stats']>
+}
 
 export interface AuthState {
   user: AuthUser | null

@@ -1,5 +1,6 @@
 export type SidebarIconName =
   | 'learn'
+  | 'vocabulary'
   | 'pronunciation'
   | 'leaderboard'
   | 'quests'
@@ -7,6 +8,7 @@ export type SidebarIconName =
   | 'profile'
   | 'admin'
   | 'more'
+
 
 interface SidebarIconProps {
   name: SidebarIconName
@@ -19,6 +21,16 @@ export default function SidebarIcon({ name }: SidebarIconProps) {
         <path className="icon-accent" d="m3 14 13-10 13 10-3 4-10-8-10 8-3-4Z" />
         <path className="icon-main" d="M7 15.5 16 9l9 6.5V28H7V15.5Z" />
         <rect className="icon-detail" x="13" y="19" width="6" height="9" rx="2" />
+      </svg>
+    )
+  }
+
+  if (name === 'vocabulary') {
+    return (
+      <svg viewBox="0 0 32 32" aria-hidden="true">
+        <path className="icon-main" d="M6 5h18a3 3 0 0 1 3 3v18a3 3 0 0 1-3 3H6a3 3 0 0 1-3-3V8a3 3 0 0 1 3-3Z" />
+        <path className="icon-detail" d="M9 10h14M9 16h14M9 22h8" strokeWidth="2.5" strokeLinecap="round" />
+        <path className="icon-accent" d="M6 5v24" strokeWidth="3" />
       </svg>
     )
   }

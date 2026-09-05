@@ -1,6 +1,8 @@
 import api from '../api/axios'
 import type {
   EmptyQuestionResponse,
+  AssignQuestionsToLessonRequest,
+  AssignQuestionsToLessonResponse,
   GetAdminQuestionDetailResponse,
   GetAdminQuestionsResponse,
   GetLessonQuestionsResponse,
@@ -74,12 +76,12 @@ export const adminQuestionService = {
 
   async updateQuestion(
     questionId: string,
-    formData: FormData,
+    payload: FormData | Record<string, unknown>,
     onProgress?: QuestionUploadProgressHandler,
   ): Promise<QuestionResponse> {
     const response = await api.patch<GetAdminQuestionDetailResponse>(
       `/admin/questions/${questionId}`,
-      formData,
+      payload,
       getUploadConfig(onProgress),
     )
     onProgress?.(100)
@@ -116,11 +118,21 @@ export const adminQuestionService = {
     lessonId: string,
     questionIds: string[],
   ): Promise<LessonQuestionResponse[]> {
-    const response = await api.post<GetLessonQuestionsResponse>(
+    const result = await this.assignQuestionsToLessonWithResult(lessonId, {
+      questionIds,
+    })
+    return result.questions
+  },
+
+  async assignQuestionsToLessonWithResult(
+    lessonId: string,
+    payload: AssignQuestionsToLessonRequest,
+  ): Promise<AssignQuestionsToLessonResponse['data']> {
+    const response = await api.post<AssignQuestionsToLessonResponse>(
       `/admin/lessons/${lessonId}/questions`,
-      { questionIds },
+      payload,
     )
-    return response.data.data.questions
+    return response.data.data
   },
 
   async removeQuestionFromLesson(

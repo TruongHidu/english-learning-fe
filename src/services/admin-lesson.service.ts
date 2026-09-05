@@ -10,9 +10,17 @@ import type {
 } from '../types/lesson.types'
 
 export const adminLessonService = {
-  async getLessonsByTopic(topicId: string): Promise<LessonResponse[]> {
-    const response = await api.get<GetAdminLessonsByTopicResponse>(`/admin/topics/${topicId}/lessons`)
-    return response.data.data.lessons
+  async getLessonsByTopic(
+    topicId: string,
+    options?: { signal?: AbortSignal },
+  ): Promise<LessonResponse[]> {
+    const response = await api.get<GetAdminLessonsByTopicResponse>(
+      `/admin/topics/${topicId}/lessons`,
+      options?.signal ? { signal: options.signal } : undefined,
+    )
+    return [...response.data.data.lessons].sort((left, right) =>
+      left.orderIndex - right.orderIndex || left.createdAt.localeCompare(right.createdAt),
+    )
   },
 
   async getLessonById(lessonId: string): Promise<LessonResponse> {
@@ -33,6 +41,17 @@ export const adminLessonService = {
     }
     const response = await api.post<GetAdminLessonResponse>(`/admin/topics/${topicId}/lessons`, body)
     return response.data.data.lesson
+  },
+
+  async createLessonForAssignment(
+    topicId: string,
+    input: CreateLessonInput,
+  ): Promise<LessonResponse> {
+    return this.createLesson(topicId, {
+      ...input,
+      questionCount: 0,
+      status: 'DRAFT',
+    })
   },
 
   async updateLesson(lessonId: string, input: UpdateLessonInput): Promise<LessonResponse> {

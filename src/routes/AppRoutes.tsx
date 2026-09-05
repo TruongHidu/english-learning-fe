@@ -21,11 +21,17 @@ import AdminTopicDetailPage from '../pages/admin/AdminTopicDetailPage'
 import AdminUserDetailPage from '../pages/admin/AdminUserDetailPage'
 import AdminUserListPage from '../pages/admin/AdminUserListPage'
 import AppSectionPage from '../pages/app/AppSectionPage'
+import ShopPage from '../pages/shop/ShopPage'
 import AuthPage from '../pages/auth/AuthPage'
 import ForbiddenPage from '../pages/errors/ForbiddenPage'
 import CourseSectionsPage from '../pages/learn/CourseSectionsPage'
 import LearnPage from '../pages/learn/LearnPage'
+import StartLessonPage from '../pages/learn/StartLessonPage'
+import SectionTopicsPage from '../pages/learn/SectionTopicsPage'
+import TopicLearningPathPage from '../pages/learn/TopicLearningPathPage'
 import ProfilePage from '../pages/profile/ProfilePage'
+import LearnedVocabularyPage from '../pages/vocabulary/LearnedVocabularyPage'
+import UserLearnedVocabularyPage from '../pages/vocabulary/UserLearnedVocabularyPage'
 
 function DashboardRedirect() {
   const { user } = useAuth()
@@ -59,7 +65,12 @@ function AppRoutes() {
           }
         >
           <Route path="/learn" element={<LearnPage />} />
+          <Route path="/vocabulary" element={<LearnedVocabularyPage />} />
+          <Route path="/vocabularies/learned" element={<UserLearnedVocabularyPage />} />
           <Route path="/learn/courses/:courseId" element={<CourseSectionsPage />} />
+          <Route path="/learn/courses/:courseId/sections/:sectionId" element={<SectionTopicsPage />} />
+          <Route path="/learn/topics/:topicId" element={<TopicLearningPathPage />} />
+          <Route path="/learn/lessons/:lessonId/start" element={<StartLessonPage />} />
           <Route
             path="/pronunciation"
             element={<AppSectionPage section="pronunciation" />}
@@ -69,7 +80,7 @@ function AppRoutes() {
             element={<AppSectionPage section="leaderboard" />}
           />
           <Route path="/quests" element={<AppSectionPage section="quests" />} />
-          <Route path="/shop" element={<AppSectionPage section="shop" />} />
+          <Route path="/shop" element={<ShopPage />} />
           <Route path="/profile" element={<ProfilePage />} />
         </Route>
 
@@ -98,6 +109,7 @@ function AppRoutes() {
           <Route path="lessons/:lessonId" element={<AdminLessonDetailPage />} />
           <Route path="questions" element={<AdminQuestionListPage />} />
           <Route path="ai-content" element={<AdminAIContentPage />} />
+          <Route path="ai-workflow" element={<Navigate to="/admin/ai-content" replace />} />
           <Route path="users" element={<AdminUserListPage />} />
           <Route path="users/:userId" element={<AdminUserDetailPage />} />
           <Route path="payments" element={<AdminPaymentListPage />} />

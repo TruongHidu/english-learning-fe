@@ -23,4 +23,28 @@ export const userService = {
   async changePassword(input: ChangePasswordRequest): Promise<void> {
     await api.patch<ChangePasswordResponse>('/users/me/password', input)
   },
+
+  async getLearnedVocabularies() {
+    const response = await api.get<{ success: true; message: string; data: { vocabularies: any[] } }>('/users/vocabularies')
+    return response.data.data.vocabularies
+  },
+
+  async getVocabulariesBySections() {
+    const response = await api.get<{ success: true; message: string; data: { sections: any[] } }>('/users/vocabularies/by-sections')
+    return response.data.data.sections
+  },
+
+  async getTopicVocabularies(topicId: string) {
+    const response = await api.get<{ success: true; message: string; data: { topicGroup: any } }>(`/users/topics/${topicId}/vocabularies`)
+    return response.data.data.topicGroup
+  },
+
+  async getLessonVocabularies(lessonId: string) {
+    const response = await api.get<{ success: true; message: string; data: { lessonGroup: any } }>(`/users/lessons/${lessonId}/vocabularies`)
+    return response.data.data.lessonGroup
+  },
 }
+
+
+
+

@@ -9,6 +9,11 @@
   --muted-hover-color: #4b4b4b;
   --secondary-border: #e5e5e5;
   --secondary-shadow: #d0d0d0;
+  --surface-bg: #ffffff;
+  --surface-soft-bg: #f1f5f9;
+  --surface-border: #e2e8f0;
+  --surface-shadow: #e2e8f0;
+  --subtle-color: #94a3b8;
   color: var(--heading-color);
   background: var(--page-bg);
   font-family: "Arial Rounded MT Bold", "Nunito", "Segoe UI", sans-serif;
@@ -26,6 +31,11 @@
     --muted-hover-color: #d0ceca;
     --secondary-border: #404546;
     --secondary-shadow: #2c3031;
+    --surface-bg: #202526;
+    --surface-soft-bg: #282e30;
+    --surface-border: #40494b;
+    --surface-shadow: #0e1112;
+    --subtle-color: #858d8f;
   }
 }
 

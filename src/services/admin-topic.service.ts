@@ -10,6 +10,16 @@ import type {
 } from '../types/topic.types'
 
 export const adminTopicService = {
+  async getAllTopics(): Promise<TopicResponse[]> {
+    const response = await api.get<{ success: true; message: string; data: { topics: TopicResponse[] } }>('/admin/topics')
+    return response.data.data.topics
+  },
+
+  async getTopicsByCourse(courseId: string): Promise<TopicResponse[]> {
+    const response = await api.get<{ success: true; message: string; data: { topics: TopicResponse[] } }>(`/admin/courses/${courseId}/topics`)
+    return response.data.data.topics
+  },
+
   async getTopicsBySection(sectionId: string): Promise<TopicResponse[]> {
     const response = await api.get<GetAdminTopicsBySectionResponse>(`/admin/sections/${sectionId}/topics`)
     return response.data.data.topics
