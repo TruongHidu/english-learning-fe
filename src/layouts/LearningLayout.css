@@ -1366,3 +1366,138 @@ button.sample-card__action:active {
     font-size: 11px;
   }
 }
+
+
+/* ==========================================================================
+   Diamond Menu (Duolingo Style Popover)
+   ========================================================================== */
+.diamond-menu {
+  position: relative;
+  display: flex;
+  height: 100%;
+  align-items: center;
+}
+
+.diamond-menu__trigger {
+  min-height: 54px;
+  padding: 8px 14px;
+  background: transparent;
+  border: 0;
+  border-radius: 15px;
+  cursor: pointer;
+  transition: background 140ms ease;
+}
+
+.diamond-menu__trigger:hover,
+.diamond-menu__trigger:focus-visible,
+.diamond-menu--open .diamond-menu__trigger {
+  background: rgb(28 176 246 / 10%);
+}
+
+.diamond-menu__trigger:focus-visible {
+  outline: 3px solid #84d8ff;
+  outline-offset: 2px;
+}
+
+.diamond-popover {
+  position: absolute;
+  z-index: 50;
+  top: calc(100% - 3px);
+  right: -48px;
+  width: min(390px, calc(100vw - 36px));
+  padding: 22px 24px;
+  color: var(--heading-color);
+  background: var(--page-bg, #ffffff);
+  border: 2px solid var(--auth-input-border, #e5e5e5);
+  border-radius: 18px;
+  box-shadow: 0 12px 32px rgb(0 0 0 / 12%);
+  text-align: left;
+}
+
+.diamond-popover::before {
+  position: absolute;
+  top: -10px;
+  right: 79px;
+  width: 18px;
+  height: 18px;
+  background: var(--page-bg, #ffffff);
+  border-top: 2px solid var(--auth-input-border, #e5e5e5);
+  border-left: 2px solid var(--auth-input-border, #e5e5e5);
+  content: "";
+  transform: rotate(45deg);
+}
+
+.diamond-popover__card {
+  display: flex;
+  align-items: center;
+  gap: 18px;
+}
+
+.diamond-popover__chest-container {
+  flex-shrink: 0;
+  width: 100px;
+  height: 88px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.diamond-chest-svg {
+  width: 100%;
+  height: 100%;
+  filter: drop-shadow(0 4px 8px rgba(0, 0, 0, 0.1));
+}
+
+.diamond-popover__info {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 5px;
+}
+
+.diamond-popover__title {
+  margin: 0;
+  color: var(--heading-color, #3c3c3c);
+  font-size: 22px;
+  font-weight: 800;
+  line-height: 1.2;
+}
+
+.diamond-popover__status {
+  margin: 0 0 4px 0;
+  color: var(--muted-color, #777777);
+  font-size: 16px;
+  font-weight: 600;
+  line-height: 1.3;
+}
+
+.diamond-popover__shop-link {
+  display: inline-block;
+  padding: 0;
+  margin-top: 2px;
+  background: transparent;
+  border: 0;
+  color: #1cb0f6;
+  font-size: 15px;
+  font-weight: 800;
+  letter-spacing: 0.8px;
+  text-transform: uppercase;
+  cursor: pointer;
+  transition: filter 120ms ease, transform 80ms ease;
+}
+
+.diamond-popover__shop-link:hover {
+  filter: brightness(1.15);
+  text-decoration: underline;
+}
+
+.diamond-popover__shop-link:active {
+  transform: translateY(1px);
+}
+
+@media (prefers-color-scheme: dark) {
+  .diamond-popover,
+  .diamond-popover::before {
+    --auth-input-border: #756f61;
+  }
+}

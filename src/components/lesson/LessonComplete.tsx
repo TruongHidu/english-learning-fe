@@ -6,9 +6,10 @@ interface LessonCompleteProps {
   courseId?: string
   sectionId?: string
   rewards?: LessonCompletionRewards | null
+  onRetry?: () => void
 }
 
-export default function LessonComplete({ session, courseId, sectionId, rewards }: LessonCompleteProps) {
+export default function LessonComplete({ session, courseId, sectionId, rewards, onRetry }: LessonCompleteProps) {
   const continueUrl = courseId && sectionId
     ? `/learn/courses/${courseId}/sections/${sectionId}`
     : '/learn'
@@ -17,8 +18,8 @@ export default function LessonComplete({ session, courseId, sectionId, rewards }
     ? Math.round((session.correctCount / session.totalQuestions) * 100)
     : 0
 
-  const isPerfect = accuracy === 100
-  const isPassed = !rewards || accuracy >= 80 // fallback if no rewards
+  const isPassed = session.status === 'COMPLETED' || (session.status !== 'FAILED' && Boolean(rewards))
+  const isPerfect = isPassed && accuracy === 100
 
   return (
     <main className="lesson-complete-page mx-auto flex min-h-[100dvh] w-full max-w-2xl flex-col items-center justify-center px-4 py-12 md:px-8">
@@ -112,13 +113,27 @@ export default function LessonComplete({ session, courseId, sectionId, rewards }
         </div>
       )}
 
-      {/* Continue Button */}
-      <div className="w-full max-w-sm">
+      {/* Action Buttons */}
+      <div className="w-full max-w-sm flex flex-col gap-3">
+        {!isPassed && onRetry ? (
+          <button
+            type="button"
+            onClick={onRetry}
+            className="block w-full rounded-xl bg-emerald-500 px-5 py-4 text-center text-lg font-black uppercase tracking-wider text-white shadow-[0_4px_0_#047857] transition-all hover:bg-emerald-600 active:translate-y-1 active:shadow-none cursor-pointer focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-400"
+          >
+            Làm lại bài học
+          </button>
+        ) : null}
+
         <Link
           to={continueUrl}
-          className="block w-full rounded-xl bg-emerald-500 px-5 py-4 text-center text-lg font-black uppercase tracking-wider text-white shadow-[0_4px_0_#047857] transition-all hover:bg-emerald-600 active:translate-y-1 active:shadow-none focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-400"
+          className={`block w-full rounded-xl px-5 py-4 text-center text-lg font-black uppercase tracking-wider transition-all cursor-pointer ${
+            isPassed
+              ? 'bg-emerald-500 text-white shadow-[0_4px_0_#047857] hover:bg-emerald-600 active:translate-y-1 active:shadow-none focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-400'
+              : 'bg-slate-100 text-slate-700 hover:bg-slate-200 border border-slate-300'
+          }`}
         >
-          Tiếp tục
+          {isPassed ? 'Tiếp tục' : 'Về danh sách bài học'}
         </Link>
       </div>
     </main>

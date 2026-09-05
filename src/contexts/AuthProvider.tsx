@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import type { ReactNode } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { authService } from '../services/auth.service'
+import { userService } from '../services/user.service'
 import type { AuthSession, AuthUser, LoginRequest } from '../types/auth.types'
 import {
   AUTH_INVALIDATED_EVENT,
@@ -50,6 +51,103 @@ export function AuthProvider({ children }: AuthProviderProps) {
     }
   }, [restoreSession])
 
+  const updateCachedUser = useCallback((patch: AuthUserCachePatch) => {
+    setUser((currentUser) => {
+      if (!currentUser) return currentUser
+
+      const { stats, ...userPatch } = patch
+      return {
+        ...currentUser,
+        ...userPatch,
+        stats: stats
+          ? {
+              ...currentUser.stats,
+              ...stats,
+            }
+          : currentUser.stats,
+      }
+    })
+  }, [])
+
+  // Background refresh profile from DB whenever accessToken is present
+  useEffect(() => {
+    if (!accessToken) return
+    let isMounted = true
+
+    userService
+      .getProfile()
+      .then((profile) => {
+        if (isMounted && profile?.stats) {
+          updateCachedUser({ stats: profile.stats })
+        }
+      })
+      .catch(() => {
+        // ignore background sync errors
+      })
+
+    return () => {
+      isMounted = false
+    }
+  }, [accessToken, updateCachedUser])
+
+  // Real-time SSE and BroadcastChannel synchronization
+  useEffect(() => {
+    if (!accessToken || !user) return
+
+    const baseUrl = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000/api/v1'
+    let es: EventSource | null = null
+
+    try {
+      es = new EventSource(`${baseUrl}/users/events?token=${encodeURIComponent(accessToken)}`)
+
+      es.onmessage = (event) => {
+        try {
+          const payload = JSON.parse(event.data)
+          if (payload?.type === 'DIAMOND_UPDATED' && payload?.diamond !== undefined) {
+            updateCachedUser({
+              stats: {
+                diamond: payload.diamond,
+              },
+            })
+            window.dispatchEvent(new CustomEvent('DIAMOND_UPDATED', { detail: payload }))
+          }
+        } catch {
+          // ignore keep-alive or JSON parse errors
+        }
+      }
+    } catch (err) {
+      console.error('SSE initialization error:', err)
+    }
+
+    // Cross-tab real-time sync via BroadcastChannel
+    let bc: BroadcastChannel | null = null
+    if (typeof BroadcastChannel !== 'undefined') {
+      try {
+        bc = new BroadcastChannel('lingofox_realtime')
+        bc.onmessage = (event) => {
+          const payload = event.data
+          if (payload?.type === 'DIAMOND_UPDATED' && payload?.diamond !== undefined) {
+            if (!payload.userId || payload.userId === user.id) {
+              updateCachedUser({
+                stats: {
+                  diamond: payload.diamond,
+                },
+              })
+              window.dispatchEvent(new CustomEvent('DIAMOND_UPDATED', { detail: payload }))
+            }
+          }
+        }
+      } catch {
+        // ignore
+      }
+    }
+
+    return () => {
+      es?.close()
+      bc?.close()
+    }
+  }, [accessToken, user?.id, updateCachedUser])
+
   const login = useCallback(async (input: LoginRequest): Promise<AuthUser> => {
     const response = await authService.login(input)
     const session: AuthSession = {
@@ -69,24 +167,6 @@ export function AuthProvider({ children }: AuthProviderProps) {
     setUser(null)
     navigate('/login', { replace: true })
   }, [navigate])
-
-  const updateCachedUser = useCallback((patch: AuthUserCachePatch) => {
-    setUser((currentUser) => {
-      if (!currentUser) return currentUser
-
-      const { stats, ...userPatch } = patch
-      return {
-        ...currentUser,
-        ...userPatch,
-        stats: stats
-          ? {
-              ...currentUser.stats,
-              ...stats,
-            }
-          : currentUser.stats,
-      }
-    })
-  }, [])
 
   useEffect(() => {
     if (!accessToken || !user) return

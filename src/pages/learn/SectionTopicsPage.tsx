@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useLocation, useNavigate, useParams } from 'react-router-dom'
 import { normalizeApiError } from '../../api/api-error'
 import LessonPath from '../../components/learning/LessonPath'
+import GameOverModal from '../../components/lesson/GameOverModal'
 import { courseService } from '../../services/course.service'
 import { learningPathService } from '../../services/learning-path.service'
 import { userService } from '../../services/user.service'
@@ -13,10 +14,13 @@ import type {
 } from '../../types/learning-path.types'
 import type { SectionVocabularyItem, TopicVocabularyGroup } from '../../types/user.types'
 import { getLearningPathErrorMessage } from '../../utils/learning-errors'
+import { useAuth } from '../../hooks/useAuth'
 
 interface LocationState {
   section?: Pick<UserCourseSectionResponse, 'name' | 'description'>
   notice?: string
+  showOutOfHearts?: boolean
+  heartBlockedLesson?: LearningPathLesson
 }
 
 interface LessonScrollItem {
@@ -45,6 +49,7 @@ export default function SectionTopicsPage() {
   }>()
   const navigate = useNavigate()
   const location = useLocation()
+  const { user } = useAuth()
   const locationState = (location.state ?? {}) as LocationState
   const [section, setSection] = useState<UserCourseSectionResponse | null>(null)
   const [sectionPosition, setSectionPosition] = useState<number | null>(null)
@@ -245,7 +250,16 @@ export default function SectionTopicsPage() {
         section: section
           ? { name: section.name, description: section.description }
           : locationState.section,
+        returnTo: location.pathname,
+        returnState: { section: locationState.section },
       },
+    })
+  }
+
+  const dismissOutOfHearts = () => {
+    navigate(location.pathname, {
+      replace: true,
+      state: { section: locationState.section },
     })
   }
 
@@ -562,6 +576,15 @@ export default function SectionTopicsPage() {
           </div>
         </div>
       )}
+
+      <GameOverModal
+        isOpen={Boolean(locationState.showOutOfHearts && locationState.heartBlockedLesson)}
+        courseId={courseId}
+        sectionId={sectionId}
+        nextHeartAt={user?.stats.nextHeartAt}
+        onRetry={() => locationState.heartBlockedLesson && startLesson(locationState.heartBlockedLesson)}
+        onDismiss={dismissOutOfHearts}
+      />
     </main>
   )
 }

@@ -1,6 +1,8 @@
 import { useCallback, useEffect, useState } from 'react'
 import { useLocation, useNavigate, useParams } from 'react-router-dom'
 import LessonPath from '../../components/learning/LessonPath'
+import GameOverModal from '../../components/lesson/GameOverModal'
+import { useAuth } from '../../hooks/useAuth'
 import { learningPathService } from '../../services/learning-path.service'
 import type {
   LearningPathLesson,
@@ -11,13 +13,17 @@ import { getLearningPathErrorMessage } from '../../utils/learning-errors'
 interface LocationState {
   sectionId?: string
   courseId?: string
+  showOutOfHearts?: boolean
+  heartBlockedLesson?: LearningPathLesson
 }
 
 export default function TopicLearningPathPage() {
   const { topicId } = useParams<{ topicId: string }>()
   const navigate = useNavigate()
   const location = useLocation()
-  const { sectionId, courseId } = (location.state ?? {}) as LocationState
+  const { user } = useAuth()
+  const locationState = (location.state ?? {}) as LocationState
+  const { sectionId, courseId, showOutOfHearts, heartBlockedLesson } = locationState
   const [path, setPath] = useState<TopicLearningPath | null>(null)
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -50,8 +56,18 @@ export default function TopicLearningPathPage() {
   const openLesson = (lesson: LearningPathLesson) => {
     if (lesson.isLocked) return
     navigate(`/learn/lessons/${lesson.id}/start`, {
-      state: { lesson, sectionId, courseId },
+      state: {
+        lesson,
+        sectionId,
+        courseId,
+        returnTo: location.pathname,
+        returnState: { sectionId, courseId },
+      },
     })
+  }
+
+  const dismissOutOfHearts = () => {
+    navigate(location.pathname, { replace: true, state: { sectionId, courseId } })
   }
 
   return (
@@ -103,6 +119,15 @@ export default function TopicLearningPathPage() {
       {!isLoading && !error && path ? (
         <LessonPath lessons={path.lessons} onSelectLesson={openLesson} />
       ) : null}
+
+      <GameOverModal
+        isOpen={Boolean(showOutOfHearts && heartBlockedLesson)}
+        courseId={courseId}
+        sectionId={sectionId}
+        nextHeartAt={user?.stats.nextHeartAt}
+        onRetry={() => heartBlockedLesson && openLesson(heartBlockedLesson)}
+        onDismiss={dismissOutOfHearts}
+      />
     </main>
   )
 }

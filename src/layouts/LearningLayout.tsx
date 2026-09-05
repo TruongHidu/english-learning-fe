@@ -1,4 +1,6 @@
+import RealtimeToast from '../components/common/RealtimeToast'
 import { NavLink, Outlet, useLocation } from 'react-router-dom'
+import DiamondMenu from '../components/navigation/DiamondMenu'
 import HeartMenu from '../components/navigation/HeartMenu'
 import MoreMenu from '../components/navigation/MoreMenu'
 import SidebarIcon from '../components/navigation/SidebarIcon'
@@ -35,15 +37,6 @@ function FlameIcon() {
   )
 }
 
-function GemIcon() {
-  return (
-    <svg viewBox="0 0 24 24" aria-hidden="true">
-      <path d="m7 3-4 5v9l9 5 9-5V8l-4-5H7Z" />
-      <path d="m8 6-2 3v6l6 3.5 6-3.5V9l-2-3H8Z" />
-    </svg>
-  )
-}
-
 function XpIcon() {
   return (
     <svg viewBox="0 0 24 24" aria-hidden="true" fill="currentColor">
@@ -69,6 +62,7 @@ export default function LearningLayout() {
 
   return (
     <div className={`learning-shell${isLessonRoute ? ' learning-shell--lesson' : ''}`}>
+      <RealtimeToast />
       <aside className="learning-sidebar">
         <NavLink className="app-brand" to="/learn" aria-label="LingoFox - Học">
           lingofox
@@ -113,10 +107,7 @@ export default function LearningLayout() {
               <FlameIcon />
               <strong>{user?.stats.currentStreak ?? 0}</strong>
             </div>
-            <div className="stat-item stat-item--diamond" title="Kim cương">
-              <GemIcon />
-              <strong>{user?.stats.diamond ?? 0}</strong>
-            </div>
+            <DiamondMenu diamond={user?.stats.diamond ?? 0} />
             <HeartMenu
               currentHeart={user?.stats.currentHeart ?? 0}
               maxHeart={user?.stats.maxHeart ?? 0}

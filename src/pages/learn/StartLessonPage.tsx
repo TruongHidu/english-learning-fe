@@ -25,18 +25,22 @@ interface StartLessonLocationState {
   courseId?: string
   sectionId?: string
   section?: Pick<UserCourseSectionResponse, 'name' | 'description'>
+  returnTo?: string
+  returnState?: unknown
 }
 
 export default function StartLessonPage() {
   const { lessonId } = useParams<{ lessonId: string }>()
   const navigate = useNavigate()
   const location = useLocation()
-  const { updateCachedUser } = useAuth()
+  const { user, updateCachedUser } = useAuth()
   const {
     lesson: initialLesson,
     courseId,
     sectionId,
     section,
+    returnTo,
+    returnState,
   } = (location.state ?? {}) as StartLessonLocationState
   
   const [isStarting, setIsStarting] = useState(false)
@@ -135,11 +139,23 @@ export default function StartLessonPage() {
         return
       }
 
+      if (apiError.code === 'INSUFFICIENT_HEART') {
+        navigate(returnTo ?? backUrl, {
+          replace: true,
+          state: {
+            ...(typeof returnState === 'object' && returnState !== null ? returnState : {}),
+            showOutOfHearts: true,
+            heartBlockedLesson: initialLesson,
+          },
+        })
+        return
+      }
+
       setStartError(message)
     } finally {
       setIsStarting(false)
     }
-  }, [courseId, initialLesson, isStarting, lessonId, navigate, section, sectionId, updateCachedUser])
+  }, [backUrl, courseId, initialLesson, isStarting, lessonId, navigate, returnState, returnTo, section, sectionId, updateCachedUser])
 
   useEffect(() => {
     if (!lessonId || startedLessonRef.current === lessonId || learningData) return
@@ -211,7 +227,11 @@ export default function StartLessonPage() {
       })
     } catch (error) {
       const apiError = normalizeApiError(error)
-      console.error(apiError.message)
+      if (apiError.code === 'INSUFFICIENT_HEART') {
+        setIsGameOver(true)
+      } else {
+        console.error(apiError.message)
+      }
     } finally {
       setIsSubmitting(false)
     }
@@ -221,13 +241,19 @@ export default function StartLessonPage() {
   function handleContinue() {
     if (!learningData || !checkResult) return
 
-    if (checkResult.sessionStatus === 'FAILED' || learningData.hearts.current === 0) {
+    // Chi kich hoat GameOverModal khi thuc su HET TIM (currentHeart <= 0)
+    if (learningData.hearts.current <= 0) {
       setIsGameOver(true)
       return
     }
 
+    // Neu da hoan thanh het cau hoi, hoac phien hoc da ket thuc (du PASS hay FAILED)
     const nextIndex = currentQuestionIndex + 1
-    if (nextIndex >= totalQuestions || checkResult.sessionStatus === 'COMPLETED') {
+    if (
+      nextIndex >= totalQuestions ||
+      checkResult.sessionStatus === 'COMPLETED' ||
+      checkResult.sessionStatus === 'FAILED'
+    ) {
       setIsComplete(true)
       return
     }
@@ -263,6 +289,7 @@ export default function StartLessonPage() {
       courseId={courseId}
       sectionId={sectionId}
       rewards={completionRewards}
+      onRetry={() => void handleStart()}
     />
   }
 
@@ -278,6 +305,7 @@ export default function StartLessonPage() {
             total={totalQuestions}
             hearts={learningData.hearts.current}
             maxHearts={learningData.hearts.max}
+            diamonds={user?.stats.diamond ?? 0}
             backUrl={backUrl}
             onRequestExit={() => setIsExitConfirmOpen(true)}
           />
@@ -368,6 +396,7 @@ export default function StartLessonPage() {
           isOpen={isGameOver}
           courseId={courseId}
           sectionId={sectionId}
+          nextHeartAt={learningData.hearts.nextHeartAt}
           onRetry={() => void handleStart()}
         />
 

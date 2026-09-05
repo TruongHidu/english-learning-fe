@@ -2,6 +2,8 @@ import { useEffect, useRef, useState } from 'react'
 import type { FocusEvent } from 'react'
 import { useAuth } from '../../hooks/useAuth'
 import { userService } from '../../services/user.service'
+import { shopService } from '../../services/shop.service'
+import { getShopErrorMessage } from '../../utils/shop-errors'
 
 interface HeartMenuProps {
   currentHeart: number
@@ -51,6 +53,9 @@ export default function HeartMenu({ currentHeart, maxHeart, nextHeartAt }: Heart
   const [isOpen, setIsOpen] = useState(false)
   const [isPinned, setIsPinned] = useState(false)
   const [now, setNow] = useState(() => Date.now())
+  const [heartCost, setHeartCost] = useState<number | null>(null)
+  const [isBuying, setIsBuying] = useState(false)
+  const [purchaseError, setPurchaseError] = useState('')
   const isSyncingRef = useRef(false)
 
   const safeMaxHeart = Math.max(0, Math.min(Math.trunc(maxHeart), 20))
@@ -136,6 +141,22 @@ export default function HeartMenu({ currentHeart, maxHeart, nextHeartAt }: Heart
 
     setIsPinned(true)
     setIsOpen(true)
+    if (heartCost === null) {
+      shopService.getShop().then((data) => {
+        setHeartCost(data.items.find((item) => item.type === 'HEART')?.diamondCost ?? null)
+      }).catch(() => undefined)
+    }
+  }
+
+  async function handlePurchaseHeart() {
+    setIsBuying(true)
+    setPurchaseError('')
+    try {
+      const result = await shopService.purchaseHeart()
+      updateCachedUser({ stats: { currentHeart: result.hearts.current, maxHeart: result.hearts.max, nextHeartAt: result.hearts.nextHeartAt, diamond: result.diamond.after } })
+    } catch (error) {
+      setPurchaseError(getShopErrorMessage(error, 'Mua tim thất bại.'))
+    } finally { setIsBuying(false) }
   }
 
   const minutes = Math.floor(remainingMs / 60000)
@@ -202,9 +223,12 @@ export default function HeartMenu({ currentHeart, maxHeart, nextHeartAt }: Heart
             <div className="heart-offer">
               <EmptyHeartIcon />
               <strong>HỒI PHỤC TRÁI TIM</strong>
-              <span className="heart-offer__cost"><SmallGemIcon /> 350</span>
+              <button type="button" className="heart-offer__cost" disabled={isBuying || isFull} onClick={() => void handlePurchaseHeart()}>
+                <SmallGemIcon /> {isBuying ? 'Đang mua…' : heartCost === null ? '…' : heartCost}
+              </button>
             </div>
           </div>
+          {purchaseError && <p className="heart-popover__error" role="alert">{purchaseError}</p>}
         </section>
       )}
     </div>

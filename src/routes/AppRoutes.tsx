@@ -21,6 +21,7 @@ import AdminTopicDetailPage from '../pages/admin/AdminTopicDetailPage'
 import AdminUserDetailPage from '../pages/admin/AdminUserDetailPage'
 import AdminUserListPage from '../pages/admin/AdminUserListPage'
 import AppSectionPage from '../pages/app/AppSectionPage'
+import ShopPage from '../pages/shop/ShopPage'
 import AuthPage from '../pages/auth/AuthPage'
 import ForbiddenPage from '../pages/errors/ForbiddenPage'
 import CourseSectionsPage from '../pages/learn/CourseSectionsPage'
@@ -79,7 +80,7 @@ function AppRoutes() {
             element={<AppSectionPage section="leaderboard" />}
           />
           <Route path="/quests" element={<AppSectionPage section="quests" />} />
-          <Route path="/shop" element={<AppSectionPage section="shop" />} />
+          <Route path="/shop" element={<ShopPage />} />
           <Route path="/profile" element={<ProfilePage />} />
         </Route>
 
