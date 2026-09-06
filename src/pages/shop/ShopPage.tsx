@@ -636,25 +636,22 @@ export default function ShopPage() {
                     <GemChestIllustration />
                   </div>
                   <div className="shop-gem-amount">{pkg.diamondAmount.toLocaleString('vi-VN')} 💎</div>
-                  {pkg.bonusDiamond > 0 && (
-                    <div style={{ fontSize: 12, fontWeight: 700, color: '#16a34a', margin: '2px 0 4px' }}>
-                      +{pkg.bonusDiamond.toLocaleString('vi-VN')} 💎 thưởng
-                    </div>
-                  )}
-                  <div style={{ fontSize: 12, color: '#64748b', fontWeight: 600, marginBottom: 4 }}>
+                  <div
+                    className={`shop-gem-bonus${pkg.bonusDiamond > 0 ? '' : ' shop-gem-bonus--empty'}`}
+                    aria-hidden={pkg.bonusDiamond <= 0}
+                  >
+                    {pkg.bonusDiamond > 0 ? `+${pkg.bonusDiamond.toLocaleString('vi-VN')} 💎 thưởng` : '\u00a0'}
+                  </div>
+                  <div className="shop-gem-total">
                     Tổng: {pkg.totalDiamond.toLocaleString('vi-VN')} 💎
                   </div>
-                  <div className="shop-gem-name">{pkg.name}</div>
-                  <div style={{ fontSize: 14, fontWeight: 800, color: '#334155', margin: '4px 0 10px' }}>
+                  <div className="shop-gem-name" title={pkg.name}>{pkg.name}</div>
+                  <div className="shop-gem-price">
                     {formatVnd(pkg.price)}
                   </div>
-                  {pkg.description ? (
-                    <p style={{ fontSize: 11, color: '#94a3b8', margin: '0 0 12px', lineHeight: 1.3, minHeight: 28 }}>
-                      {pkg.description}
-                    </p>
-                  ) : (
-                    <div style={{ minHeight: 28 }} />
-                  )}
+                  <p className="shop-gem-description" title={pkg.description || undefined}>
+                    {pkg.description || '\u00a0'}
+                  </p>
                   <button type="button" className="shop-gem-btn" disabled>
                     CHƯA HỖ TRỢ THANH TOÁN
                   </button>

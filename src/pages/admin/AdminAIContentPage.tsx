@@ -86,6 +86,7 @@ export default function AdminAIContentPage() {
     'FILL_BLANK',
     'MATCHING',
     'ORDER_SENTENCE',
+    'TRANSLATION',
   ])
   const [questionQuantity, setQuestionQuantity] = useState(8)
   const [questionDifficulty, setQuestionDifficulty] = useState<'EASY' | 'MEDIUM' | 'HARD'>('EASY')
@@ -1588,6 +1589,7 @@ export default function AdminAIContentPage() {
                     { id: 'FILL_BLANK', label: 'Điền từ' },
                     { id: 'MATCHING', label: 'Nối từ' },
                     { id: 'ORDER_SENTENCE', label: 'Sắp xếp câu' },
+                    { id: 'TRANSLATION', label: 'Dịch câu' },
                   ] satisfies ReadonlyArray<{ id: AiSupportedQuestionType; label: string }>).map((t) => (
                     <label
                       key={t.id}

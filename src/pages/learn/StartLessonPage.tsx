@@ -18,6 +18,7 @@ import MultipleChoiceQuestion from '../../components/lesson/MultipleChoiceQuesti
 import MatchingQuestion from '../../components/lesson/MatchingQuestion'
 import FillBlankQuestion from '../../components/lesson/FillBlankQuestion'
 import OrderSentenceQuestion from '../../components/lesson/OrderSentenceQuestion'
+import TranslationQuestion from '../../components/lesson/TranslationQuestion'
 import '../../components/lesson/LessonQuiz.css'
 
 interface StartLessonLocationState {
@@ -357,11 +358,24 @@ export default function StartLessonPage() {
                 />
               )}
 
+              {/* Translation */}
+              {question.type === 'TRANSLATION' && (
+                <TranslationQuestion
+                  question={question}
+                  answer={typeof selectedAnswer === 'string' ? selectedAnswer : ''}
+                  disabled={isSubmitting || checkResult !== null}
+                  checkResult={checkResult}
+                  onChange={setSelectedAnswer}
+                  onSubmit={() => void handleCheck()}
+                />
+              )}
+
               {/* Other types placeholders */}
               {question.type !== 'MULTIPLE_CHOICE' &&
                 question.type !== 'MATCHING' &&
                 question.type !== 'FILL_BLANK' &&
-                question.type !== 'ORDER_SENTENCE' && (
+                question.type !== 'ORDER_SENTENCE' &&
+                question.type !== 'TRANSLATION' && (
                 <div className="lesson-alert lesson-alert--warning mt-6 flex-1 rounded-xl p-6 text-center text-sm font-bold">
                   Loại câu hỏi này ({question.type}) chưa được hỗ trợ hiển thị.
                 </div>

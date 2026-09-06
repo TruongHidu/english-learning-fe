@@ -91,11 +91,15 @@ function validateCandidate(
     if (new Set(left).size !== left.length || new Set(right).size !== right.length) {
       errors.push('Các vế ghép không được trùng nhau.')
     }
-  } else {
+  } else if (candidate.type === 'ORDER_SENTENCE') {
     if (!candidate.correctAnswer.trim()) errors.push('Câu hoàn chỉnh là bắt buộc.')
     if (candidate.options.length < 2 || !sameTokens(candidate.correctAnswer, candidate.options)) {
       errors.push('Các word chip phải khớp với các từ trong câu hoàn chỉnh.')
     }
+  } else if (!candidate.correctAnswer.trim()) {
+    errors.push('Bản dịch tiếng Việt là bắt buộc.')
+  } else if (candidate.correctAnswer.trim().length > 2000) {
+    errors.push('Bản dịch tối đa 2000 ký tự.')
   }
   return errors
 }
@@ -293,6 +297,15 @@ export default function AiQuestionPreview({
               )}
               {candidate.type === 'ORDER_SENTENCE' && (
                 <OrderSentenceEditor candidate={candidate} disabled={disabled} onChange={updateCandidate} />
+              )}
+              {candidate.type === 'TRANSLATION' && (
+                <CandidateTextField
+                  label="Bản dịch tiếng Việt đúng *"
+                  value={candidate.correctAnswer}
+                  disabled={disabled}
+                  multiline
+                  onChange={(correctAnswer) => updateCandidate({ ...candidate, correctAnswer })}
+                />
               )}
 
               {errors.length > 0 && (
