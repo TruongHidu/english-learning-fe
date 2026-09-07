@@ -1,4 +1,4 @@
-import { act, render, screen } from '@testing-library/react'
+import { act, fireEvent, render, screen } from '@testing-library/react'
 import { MemoryRouter, Route, Routes } from 'react-router-dom'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { ApiError } from '../../api/api-error'
@@ -56,7 +56,7 @@ async function flushEffects() {
 
 describe('PaymentResultPage', () => {
   beforeEach(() => {
-    vi.clearAllMocks()
+    vi.resetAllMocks()
     mocks.getShop.mockResolvedValue({
       user: { diamond: 220, currentHeart: 5, maxHeart: 5, nextHeartAt: null },
       items: [],
@@ -68,14 +68,14 @@ describe('PaymentResultPage', () => {
 
   it('không tin Return URL để tự đánh dấu SUCCESS', async () => {
     mocks.getPayment.mockResolvedValue(pendingPayment)
-    renderResult('/payment/result?signatureValid=true&paymentId=aaaaaaaaaaaaaaaaaaaaaaaa&transactionCode=PAY001')
+    renderResult('/payment/result?signatureValid=true&paymentId=aaaaaaaaaaaaaaaaaaaaaaaa&transactionCode=PAY001&status=SUCCESS&vnp_ResponseCode=00')
     await flushEffects()
 
-    expect(screen.getByRole('heading', { name: 'Đang xác nhận thanh toán' })).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: 'Giao dịch chưa được xác nhận' })).toBeInTheDocument()
     expect(screen.queryByText('Thanh toán thành công')).not.toBeInTheDocument()
   })
 
-  it('poll PENDING thành SUCCESS, dừng ở terminal và refresh số dư đúng một lần', async () => {
+  it('retry thủ công PENDING thành SUCCESS và refresh số dư đúng một lần', async () => {
     vi.useFakeTimers()
     mocks.getPayment
       .mockResolvedValueOnce(pendingPayment)
@@ -86,13 +86,9 @@ describe('PaymentResultPage', () => {
       })
     renderResult('/payment/result?signatureValid=true&paymentId=aaaaaaaaaaaaaaaaaaaaaaaa&transactionCode=PAY001')
     await flushEffects()
-    expect(screen.getByText('Đang xác nhận thanh toán')).toBeInTheDocument()
+    expect(screen.getByText('Giao dịch chưa được xác nhận')).toBeInTheDocument()
 
-    await act(async () => {
-      vi.advanceTimersByTime(2000)
-      await Promise.resolve()
-      await Promise.resolve()
-    })
+    fireEvent.click(screen.getByRole('button', { name: 'Kiểm tra lại' }))
     await flushEffects()
 
     expect(screen.getByRole('heading', { name: 'Thanh toán thành công' })).toBeInTheDocument()
@@ -118,7 +114,7 @@ describe('PaymentResultPage', () => {
     expect(mocks.getPayment).toHaveBeenCalledTimes(1)
   })
 
-  it('hết 30 giây vẫn giữ PENDING và cho phép kiểm tra lại', async () => {
+  it('không tự poll sau 30 giây và giữ PENDING để retry thủ công', async () => {
     vi.useFakeTimers()
     mocks.getPayment.mockResolvedValue(pendingPayment)
     renderResult('/payment/result?signatureValid=true&paymentId=aaaaaaaaaaaaaaaaaaaaaaaa')
@@ -129,9 +125,70 @@ describe('PaymentResultPage', () => {
       await Promise.resolve()
     })
 
-    expect(screen.getByRole('heading', { name: 'Đang xác nhận thanh toán' })).toBeInTheDocument()
-    expect(screen.getByText(/VNPay đang xác nhận giao dịch/)).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: 'Giao dịch chưa được xác nhận' })).toBeInTheDocument()
+    expect(mocks.getPayment).toHaveBeenCalledTimes(1)
+    expect(vi.getTimerCount()).toBe(0)
     expect(screen.getByRole('button', { name: 'Kiểm tra lại' })).toBeEnabled()
+  })
+
+  it.each([
+    ['SUCCESS', 'Thanh toán thành công'],
+    ['FAILED', 'Thanh toán thất bại'],
+    ['CANCELLED', 'Bạn đã hủy giao dịch'],
+    ['EXPIRED', 'Giao dịch đã hết hạn'],
+  ] as const)('hiển thị ngay %s từ backend', async (status, title) => {
+    mocks.getPayment.mockResolvedValue({ ...pendingPayment, status })
+    renderResult('/payment/result?signatureValid=true&returnResult=processed&paymentId=aaaaaaaaaaaaaaaaaaaaaaaa')
+    await flushEffects()
+    expect(screen.getByRole('heading', { name: title })).toBeInTheDocument()
+    expect(mocks.getPayment).toHaveBeenCalledTimes(1)
+    expect(mocks.getShop).toHaveBeenCalledTimes(status === 'SUCCESS' ? 1 : 0)
+    expect(mocks.updateCachedUser).toHaveBeenCalledTimes(status === 'SUCCESS' ? 1 : 0)
+  })
+
+  it('thiếu paymentId không gọi API', async () => {
+    renderResult('/payment/result')
+    await flushEffects()
+    expect(screen.getByRole('heading', { name: 'Không tìm thấy giao dịch' })).toBeInTheDocument()
+    expect(mocks.getPayment).not.toHaveBeenCalled()
+  })
+
+  it('network error hiển thị lỗi và cho retry thủ công', async () => {
+    mocks.getPayment.mockRejectedValueOnce(new Error('Mất kết nối'))
+      .mockResolvedValueOnce({ ...pendingPayment, status: 'SUCCESS' })
+    renderResult('/payments/aaaaaaaaaaaaaaaaaaaaaaaa')
+    await flushEffects()
+    expect(screen.getByRole('alert')).toHaveTextContent('Mất kết nối')
+    expect(mocks.getShop).not.toHaveBeenCalled()
+    fireEvent.click(screen.getByRole('button', { name: 'Kiểm tra lại' }))
+    await flushEffects()
+    expect(screen.getByRole('heading', { name: 'Thanh toán thành công' })).toBeInTheDocument()
+  })
+
+  it.each([
+    ['invalid', 'Dữ liệu chuyển hướng từ VNPay không hợp lệ'],
+    ['not_found', 'Không tìm thấy giao dịch từ lần chuyển hướng này'],
+    ['error', 'Chưa thể ghi nhận kết quả thanh toán'],
+  ])('hiển thị lỗi return %s an toàn', async (result, message) => {
+    renderResult('/payment/result?returnResult=' + result)
+    await flushEffects()
+    expect(screen.getByRole('alert')).toHaveTextContent(message)
+    expect(mocks.getShop).not.toHaveBeenCalled()
+  })
+
+  it('chỉ xóa payment đang lưu khi trạng thái terminal', async () => {
+    sessionStorage.setItem(PENDING_PAYMENT_STORAGE_KEY, JSON.stringify({
+      paymentId: pendingPayment.paymentId, transactionCode: pendingPayment.transactionCode,
+      createdAt: pendingPayment.createdAt,
+    }))
+    mocks.getPayment.mockResolvedValueOnce(pendingPayment)
+      .mockResolvedValueOnce({ ...pendingPayment, status: 'CANCELLED' })
+    renderResult('/payment/result')
+    await flushEffects()
+    expect(sessionStorage.getItem(PENDING_PAYMENT_STORAGE_KEY)).not.toBeNull()
+    fireEvent.click(screen.getByRole('button', { name: 'Kiểm tra lại' }))
+    await flushEffects()
+    expect(sessionStorage.getItem(PENDING_PAYMENT_STORAGE_KEY)).toBeNull()
   })
 
   it('FAILED không refresh hoặc thay đổi số dư', async () => {
@@ -161,7 +218,7 @@ describe('PaymentResultPage', () => {
 
     expect(screen.getByRole('alert')).toHaveTextContent('Dữ liệu chuyển hướng từ VNPay không hợp lệ')
     expect(mocks.getPayment).toHaveBeenCalledWith('bbbbbbbbbbbbbbbbbbbbbbbb', expect.any(AbortSignal))
-    expect(screen.getByRole('heading', { name: 'Giao dịch đã hủy' })).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: 'Bạn đã hủy giao dịch' })).toBeInTheDocument()
   })
 
   it('fallback sang sessionStorage khi URL thiếu paymentId', async () => {
@@ -180,7 +237,7 @@ describe('PaymentResultPage', () => {
     await flushEffects()
 
     expect(mocks.getPayment).toHaveBeenCalledWith('dddddddddddddddddddddddd', expect.any(AbortSignal))
-    expect(screen.getByRole('heading', { name: 'Giao dịch hết hạn' })).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: 'Giao dịch đã hết hạn' })).toBeInTheDocument()
   })
 
   it('hiển thị an toàn khi payment không tồn tại hoặc thuộc user khác', async () => {

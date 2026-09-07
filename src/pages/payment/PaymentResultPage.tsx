@@ -12,8 +12,8 @@ import './PaymentPages.css'
 const RESULT_CONTENT: Record<PaymentStatus, { icon: string; title: string; message: string }> = {
   PENDING: {
     icon: '⏳',
-    title: 'Đang xác nhận thanh toán',
-    message: 'VNPay đang gửi kết quả chính thức. Vui lòng giữ trang này mở trong giây lát.',
+    title: 'Giao dịch chưa được xác nhận',
+    message: 'Giao dịch chưa được xác nhận hoặc chưa hoàn tất. Bạn có thể kiểm tra lại hoặc xem lịch sử thanh toán.',
   },
   SUCCESS: {
     icon: '✓',
@@ -23,16 +23,16 @@ const RESULT_CONTENT: Record<PaymentStatus, { icon: string; title: string; messa
   FAILED: {
     icon: '!',
     title: 'Thanh toán thất bại',
-    message: 'Giao dịch chưa được thanh toán. Số dư kim cương của bạn không thay đổi.',
+    message: 'Giao dịch không được xác nhận thành công. Số dư kim cương của bạn không thay đổi.',
   },
   CANCELLED: {
     icon: '×',
-    title: 'Giao dịch đã hủy',
+    title: 'Bạn đã hủy giao dịch',
     message: 'Bạn đã hủy giao dịch trên VNPay. Số dư kim cương của bạn không thay đổi.',
   },
   EXPIRED: {
     icon: '⌛',
-    title: 'Giao dịch hết hạn',
+    title: 'Giao dịch đã hết hạn',
     message: 'Thời gian thanh toán đã kết thúc. Bạn có thể tạo một giao dịch mới.',
   },
 }
@@ -59,16 +59,17 @@ export default function PaymentResultPage() {
   const { updateCachedUser } = useAuth()
   const pendingPayment = useMemo(() => pendingPaymentStorage.get(), [])
   const signatureValue = searchParams.get('signatureValid')
+  const returnResult = searchParams.get('returnResult')
   const returnTransactionCode = searchParams.get('transactionCode')
   const isReturnRoute = !routePaymentId
-  const hasInvalidSignature = isReturnRoute && signatureValue === 'false'
+  const hasInvalidSignature = isReturnRoute && (signatureValue === 'false' || returnResult === 'invalid')
   const urlPaymentId = searchParams.get('paymentId')
   const paymentId = useMemo(() => {
     if (isValidPaymentId(routePaymentId)) return routePaymentId
     if (signatureValue === 'true' && isValidPaymentId(urlPaymentId)) return urlPaymentId
     return pendingPayment?.paymentId ?? null
   }, [pendingPayment?.paymentId, routePaymentId, signatureValue, urlPaymentId])
-  const { payment, isLoading, isChecking, isTimedOut, isNotFound, error, retry } =
+  const { payment, isLoading, isNotFound, error, retry } =
     usePaymentStatus(paymentId)
   const refreshedPaymentsRef = useRef(new Set<string>())
   const [newBalance, setNewBalance] = useState<number | null>(null)
@@ -123,6 +124,15 @@ export default function PaymentResultPage() {
             Mã giao dịch trong đường dẫn không khớp. Kết quả bên dưới là dữ liệu chính thức từ máy chủ.
           </div>
         )}
+        {isReturnRoute && returnResult === 'not_found' && (
+          <div className="payment-warning" role="alert">Không tìm thấy giao dịch từ lần chuyển hướng này.</div>
+        )}
+        {isReturnRoute && returnResult === 'error' && (
+          <div className="payment-warning" role="alert">
+            Chưa thể ghi nhận kết quả thanh toán. Kiểm tra lại chỉ tải trạng thái đã lưu, không thực hiện thanh toán mới.
+          </div>
+        )}
+        {error && !isNotFound && <div className="payment-warning" role="alert">{error}</div>}
 
         {!paymentId ? (
           <>
@@ -149,19 +159,12 @@ export default function PaymentResultPage() {
             </div>
             <h1>{content.title}</h1>
             <p>{content.message}</p>
-            {isChecking && <p className="payment-live-status" role="status">Đang tự động kiểm tra lại mỗi 2 giây…</p>}
-            {isTimedOut && (
-              <div className="payment-timeout" role="status">
-                VNPay đang xác nhận giao dịch. Bạn có thể thử kiểm tra lại hoặc xem trong lịch sử thanh toán.
-              </div>
-            )}
-            {error && !isTimedOut && <div className="payment-warning" role="status">{error}</div>}
             <PaymentSummary payment={payment} balance={newBalance} />
           </>
         ) : null}
 
         <div className="payment-page-actions">
-          {(isTimedOut || (error && !isNotFound)) && (
+          {!isLoading && (payment?.status === 'PENDING' || (paymentId && error && !isNotFound)) && (
             <button type="button" className="payment-primary-button" onClick={retry}>
               Kiểm tra lại
             </button>
