@@ -40,8 +40,7 @@ function parseErrorResponse(value: unknown): ApiErrorResponse | null {
   if (
     !isRecord(value) ||
     value.success !== false ||
-    typeof value.message !== 'string' ||
-    typeof value.code !== 'string'
+    typeof value.message !== 'string'
   ) {
     return null
   }
@@ -49,7 +48,7 @@ function parseErrorResponse(value: unknown): ApiErrorResponse | null {
   return {
     success: false,
     message: value.message,
-    code: value.code,
+    code: typeof value.code === 'string' ? value.code : 'REQUEST_FAILED',
     errors: parseFieldErrors(value.errors),
   }
 }

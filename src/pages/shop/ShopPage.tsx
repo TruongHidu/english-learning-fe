@@ -1,16 +1,17 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
 import { useAuth } from '../../hooks/useAuth'
 import { queryClient } from '../../lib/queryClient'
 import { shopService } from '../../services/shop.service'
-import type { ShopData, ShopItem } from '../../types/shop.types'
+import { paymentService } from '../../services/payment.service'
+import type { ShopData, ShopDiamondPackage, ShopItem } from '../../types/shop.types'
+import { browserNavigation } from '../../utils/browser-navigation'
+import { formatVnd } from '../../utils/payment'
+import { getPaymentErrorMessage } from '../../utils/payment-errors'
+import { pendingPaymentStorage } from '../../utils/pending-payment'
 import { getShopErrorMessage } from '../../utils/shop-errors'
 import './ShopPage.css'
-
-function formatVnd(amount: number): string {
-  return new Intl.NumberFormat('vi-VN').format(amount) + ' ₫'
-}
 
 /* ==========================================================================
    SVG Vector Illustrations
@@ -184,6 +185,114 @@ function MascotSuperHero() {
   )
 }
 
+interface CheckoutDialogProps {
+  paymentPackage: ShopDiamondPackage
+  isCheckingOut: boolean
+  error: string
+  onConfirm(): void
+  onClose(): void
+}
+
+function CheckoutDialog({
+  paymentPackage,
+  isCheckingOut,
+  error,
+  onConfirm,
+  onClose,
+}: CheckoutDialogProps) {
+  const dialogRef = useRef<HTMLDivElement>(null)
+  const confirmButtonRef = useRef<HTMLButtonElement>(null)
+  const previousFocusRef = useRef<HTMLElement | null>(null)
+  const isCheckingOutRef = useRef(isCheckingOut)
+
+  useEffect(() => {
+    isCheckingOutRef.current = isCheckingOut
+  }, [isCheckingOut])
+
+  useEffect(() => {
+    previousFocusRef.current = document.activeElement as HTMLElement | null
+    confirmButtonRef.current?.focus()
+
+    function handleKeyDown(event: KeyboardEvent) {
+      if (event.key === 'Escape' && !isCheckingOutRef.current) {
+        onClose()
+        return
+      }
+      if (event.key !== 'Tab') return
+
+      const focusableElements = Array.from(
+        dialogRef.current?.querySelectorAll<HTMLElement>('button:not(:disabled), a[href]') ?? [],
+      )
+      if (focusableElements.length === 0) return
+      const firstElement = focusableElements[0]
+      const lastElement = focusableElements[focusableElements.length - 1]
+
+      if (event.shiftKey && document.activeElement === firstElement) {
+        event.preventDefault()
+        lastElement.focus()
+      } else if (!event.shiftKey && document.activeElement === lastElement) {
+        event.preventDefault()
+        firstElement.focus()
+      }
+    }
+
+    document.addEventListener('keydown', handleKeyDown)
+    return () => {
+      document.removeEventListener('keydown', handleKeyDown)
+      previousFocusRef.current?.focus()
+    }
+  }, [onClose])
+
+  return (
+    <div
+      className="shop-modal-overlay"
+      onMouseDown={(event) => {
+        if (event.target === event.currentTarget && !isCheckingOut) onClose()
+      }}
+    >
+      <div
+        ref={dialogRef}
+        className="shop-modal-dialog"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="checkout-modal-title"
+        aria-describedby="checkout-modal-description"
+      >
+        <div className="shop-modal-icon-box"><GemChestIllustration /></div>
+        <h3 id="checkout-modal-title" className="shop-modal-title">Xác nhận thanh toán</h3>
+        <p id="checkout-modal-description" className="shop-modal-desc">
+          Bạn sắp mua <strong>{paymentPackage.name}</strong> qua VNPay Sandbox.
+        </p>
+        <div className="shop-checkout-summary">
+          <div><span>Tổng kim cương</span><strong>{paymentPackage.totalDiamond.toLocaleString('vi-VN')} 💎</strong></div>
+          <div><span>Thanh toán</span><strong>{formatVnd(paymentPackage.price)}</strong></div>
+        </div>
+        {error && <p className="shop-checkout-error" role="alert">{error}</p>}
+        <p className="shop-checkout-note">Bạn sẽ được chuyển tới cổng VNPay để hoàn tất giao dịch.</p>
+        <div className="shop-modal-actions">
+          <button
+            ref={confirmButtonRef}
+            type="button"
+            className="shop-modal-confirm-btn"
+            disabled={isCheckingOut}
+            onClick={onConfirm}
+          >
+            {isCheckingOut ? 'ĐANG TẠO GIAO DỊCH…' : 'TIẾP TỤC VỚI VNPAY'}
+          </button>
+          <button
+            type="button"
+            className="shop-modal-cancel-btn"
+            disabled={isCheckingOut}
+            onClick={onClose}
+          >
+            QUAY LẠI
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
 /* ==========================================================================
    Main Component
    ========================================================================== */
@@ -196,6 +305,11 @@ export default function ShopPage() {
   const [purchaseError, setPurchaseError] = useState('')
   const [notice, setNotice] = useState('')
   const [buying, setBuying] = useState(false)
+  const [selectedPackage, setSelectedPackage] = useState<ShopDiamondPackage | null>(null)
+  const [checkoutPackageId, setCheckoutPackageId] = useState<string | null>(null)
+  const [checkoutError, setCheckoutError] = useState('')
+  const [pendingPayment, setPendingPayment] = useState(() => pendingPaymentStorage.get())
+  const checkoutInFlightRef = useRef(false)
   const [now, setNow] = useState(() => Date.now())
 
   // Use React Query for GET /shop
@@ -230,6 +344,18 @@ export default function ShopPage() {
       setLoadError('')
     }
   }, [shopQueryError])
+
+  useEffect(() => {
+    function handlePageShow() {
+      checkoutInFlightRef.current = false
+      setCheckoutPackageId(null)
+      setSelectedPackage(null)
+      setPendingPayment(pendingPaymentStorage.get())
+    }
+
+    window.addEventListener('pageshow', handlePageShow)
+    return () => window.removeEventListener('pageshow', handlePageShow)
+  }, [])
 
   const loading = isShopLoading && !shop
 
@@ -299,6 +425,9 @@ export default function ShopPage() {
   }, [notice])
 
   const heartItem: ShopItem | undefined = shop?.items.find((item) => item.type === 'HEART')
+  const diamondPackages = [...(shop?.diamondPackages ?? [])].sort(
+    (first, second) => first.orderIndex - second.orderIndex,
+  )
 
   const currentHearts = shop?.user.currentHeart ?? user?.stats.currentHeart ?? 0
   const maxHearts = shop?.user.maxHeart ?? user?.stats.maxHeart ?? 5
@@ -385,6 +514,48 @@ export default function ShopPage() {
     }
   }
 
+  function handleInitiatePackageCheckout(paymentPackage: ShopDiamondPackage) {
+    if (checkoutInFlightRef.current) return
+    setCheckoutError('')
+    setSelectedPackage(paymentPackage)
+  }
+
+  const handleCloseCheckout = useCallback(() => {
+    if (checkoutInFlightRef.current) return
+    setCheckoutError('')
+    setSelectedPackage(null)
+  }, [])
+
+  async function handleConfirmPackageCheckout() {
+    if (!selectedPackage || checkoutInFlightRef.current) return
+
+    checkoutInFlightRef.current = true
+    setCheckoutPackageId(selectedPackage.id)
+    setCheckoutError('')
+    let redirectStarted = false
+
+    try {
+      const checkout = await paymentService.checkout(selectedPackage.id)
+      const nextPendingPayment = {
+        paymentId: checkout.paymentId,
+        transactionCode: checkout.transactionCode,
+        createdAt: new Date().toISOString(),
+      }
+      pendingPaymentStorage.save(nextPendingPayment)
+      setPendingPayment(nextPendingPayment)
+      browserNavigation.assign(checkout.paymentUrl)
+      redirectStarted = true
+    } catch (error) {
+      setCheckoutError(getPaymentErrorMessage(error))
+      void queryClient.invalidateQueries({ queryKey: ['shop'] })
+    } finally {
+      if (!redirectStarted) {
+        checkoutInFlightRef.current = false
+        setCheckoutPackageId(null)
+      }
+    }
+  }
+
   return (
     <>
       <main className="shop-main-content">
@@ -451,6 +622,16 @@ export default function ShopPage() {
             </div>
           </div>
         </section>
+
+        {pendingPayment && (
+          <aside className="shop-pending-payment" role="status">
+            <div>
+              <strong>Có giao dịch đang chờ xác nhận</strong>
+              <span>Mã {pendingPayment.transactionCode}</span>
+            </div>
+            <button type="button" onClick={() => navigate('/payment/result')}>KIỂM TRA KẾT QUẢ</button>
+          </aside>
+        )}
 
         {/* Loading skeleton or error */}
         {loading && (
@@ -617,14 +798,19 @@ export default function ShopPage() {
             Section 3: Gói Đá quý (Gem Packs)
             ================================================================== */}
         <section className="shop-section" aria-labelledby="gems-heading">
-          <div className="shop-section-heading">
-            <h2 id="gems-heading">Gói Đá quý</h2>
-            <p>Tích lũy thêm kim cương để sở hữu nhiều vật phẩm giá trị hơn.</p>
+          <div className="shop-section-heading shop-section-heading--with-action">
+            <div>
+              <h2 id="gems-heading">Gói Đá quý</h2>
+              <p>Tích lũy thêm kim cương để sở hữu nhiều vật phẩm giá trị hơn.</p>
+            </div>
+            <button type="button" className="shop-history-link" onClick={() => navigate('/payments/history')}>
+              LỊCH SỬ THANH TOÁN
+            </button>
           </div>
 
           <div className="shop-gem-grid">
-            {shop?.diamondPackages && shop.diamondPackages.length > 0 ? (
-              shop.diamondPackages.map((pkg) => (
+            {diamondPackages.length > 0 ? (
+              diamondPackages.map((pkg) => (
                 <div className="shop-gem-card" key={pkg.id}>
                   {pkg.orderIndex === 2 && (
                     <span className="shop-gem-badge">PHỔ BIẾN NHẤT</span>
@@ -652,13 +838,18 @@ export default function ShopPage() {
                   <p className="shop-gem-description" title={pkg.description || undefined}>
                     {pkg.description || '\u00a0'}
                   </p>
-                  <button type="button" className="shop-gem-btn" disabled>
-                    CHƯA HỖ TRỢ THANH TOÁN
+                  <button
+                    type="button"
+                    className="shop-gem-btn shop-gem-btn--active"
+                    disabled={checkoutPackageId !== null}
+                    onClick={() => handleInitiatePackageCheckout(pkg)}
+                  >
+                    {checkoutPackageId === pkg.id ? 'ĐANG XỬ LÝ…' : 'MUA NGAY'}
                   </button>
                 </div>
               ))
-            ) : !loading ? (
-              <p style={{ gridColumn: '1 / -1', textAlign: 'center', color: '#64748b', padding: '24px 0' }}>
+            ) : shop && !loading ? (
+              <p className="shop-gem-empty" role="status">
                 Hiện chưa có gói đá quý nào được mở bán.
               </p>
             ) : null}
@@ -700,6 +891,16 @@ export default function ShopPage() {
           </button>
         </div>
       </aside>
+
+      {selectedPackage && (
+        <CheckoutDialog
+          paymentPackage={selectedPackage}
+          isCheckingOut={checkoutPackageId === selectedPackage.id}
+          error={checkoutError}
+          onConfirm={() => void handleConfirmPackageCheckout()}
+          onClose={handleCloseCheckout}
+        />
+      )}
 
       {/* ==================================================================
           Modal 1: Xác nhận mua tim bằng kim cương

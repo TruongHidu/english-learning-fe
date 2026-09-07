@@ -30,6 +30,8 @@ import StartLessonPage from '../pages/learn/StartLessonPage'
 import SectionTopicsPage from '../pages/learn/SectionTopicsPage'
 import TopicLearningPathPage from '../pages/learn/TopicLearningPathPage'
 import ProfilePage from '../pages/profile/ProfilePage'
+import PaymentHistoryPage from '../pages/payment/PaymentHistoryPage'
+import PaymentResultPage from '../pages/payment/PaymentResultPage'
 import LearnedVocabularyPage from '../pages/vocabulary/LearnedVocabularyPage'
 import UserLearnedVocabularyPage from '../pages/vocabulary/UserLearnedVocabularyPage'
 
@@ -81,6 +83,9 @@ function AppRoutes() {
           />
           <Route path="/quests" element={<AppSectionPage section="quests" />} />
           <Route path="/shop" element={<ShopPage />} />
+          <Route path="/payment/result" element={<PaymentResultPage />} />
+          <Route path="/payments/history" element={<PaymentHistoryPage />} />
+          <Route path="/payments/:paymentId" element={<PaymentResultPage />} />
           <Route path="/profile" element={<ProfilePage />} />
         </Route>
 
