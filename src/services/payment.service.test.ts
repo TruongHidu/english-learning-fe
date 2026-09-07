@@ -11,6 +11,16 @@ vi.mock('../api/axios', () => ({
 
 describe('paymentService', () => {
   beforeEach(() => vi.clearAllMocks())
+  it('pending accepts null and actions send no client-controlled payment fields', async () => {
+    vi.mocked(api.get).mockResolvedValue({ data: { data: null } })
+    expect(await paymentService.getPendingPayment()).toBeNull()
+    expect(api.get).toHaveBeenCalledWith('/payments/pending', { signal: undefined })
+    vi.mocked(api.post).mockResolvedValue({ data: { data: {} } })
+    await paymentService.retryPayment('abc')
+    await paymentService.cancelPayment('abc')
+    expect(api.post).toHaveBeenNthCalledWith(1, '/payments/abc/retry', {}, { timeout: 15_000 })
+    expect(api.post).toHaveBeenNthCalledWith(2, '/payments/abc/cancel', {}, { timeout: 15_000 })
+  })
 
   it('checkout chỉ gửi packageId lên backend', async () => {
     vi.mocked(api.post).mockResolvedValue({

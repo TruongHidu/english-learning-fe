@@ -34,4 +34,5 @@ export interface PaymentHistory {
 
 export type CheckoutApiResponse = ApiSuccess<CheckoutResponse>
 export type PaymentDetailApiResponse = ApiSuccess<PaymentDetail>
+export type PendingPaymentApiResponse = ApiSuccess<PaymentDetail | null>
 export type PaymentHistoryApiResponse = ApiSuccess<PaymentHistory>

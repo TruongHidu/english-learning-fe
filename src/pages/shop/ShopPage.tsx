@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { useQuery } from '@tanstack/react-query'
+import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { useAuth } from '../../hooks/useAuth'
 import { queryClient } from '../../lib/queryClient'
 import { shopService } from '../../services/shop.service'
@@ -12,6 +12,7 @@ import { getPaymentErrorMessage } from '../../utils/payment-errors'
 import { pendingPaymentStorage } from '../../utils/pending-payment'
 import { getShopErrorMessage } from '../../utils/shop-errors'
 import './ShopPage.css'
+import { usePaymentDeadline } from '../../hooks/usePaymentDeadline'
 
 /* ==========================================================================
    SVG Vector Illustrations
@@ -308,7 +309,13 @@ export default function ShopPage() {
   const [selectedPackage, setSelectedPackage] = useState<ShopDiamondPackage | null>(null)
   const [checkoutPackageId, setCheckoutPackageId] = useState<string | null>(null)
   const [checkoutError, setCheckoutError] = useState('')
-  const [pendingPayment, setPendingPayment] = useState(() => pendingPaymentStorage.get())
+  const paymentQueryClient = useQueryClient()
+  const { data: pendingPayment, isLoading: pendingLoading, isError: pendingError, refetch: refetchPending } = useQuery({
+    queryKey: ['payments', 'pending'],
+    queryFn: ({ signal }) => paymentService.getPendingPayment(signal),
+    staleTime: 0,
+  })
+  usePaymentDeadline(pendingPayment?.paymentId, pendingPayment?.expiresAt, () => { void refetchPending() })
   const checkoutInFlightRef = useRef(false)
   const [now, setNow] = useState(() => Date.now())
 
@@ -350,12 +357,12 @@ export default function ShopPage() {
       checkoutInFlightRef.current = false
       setCheckoutPackageId(null)
       setSelectedPackage(null)
-      setPendingPayment(pendingPaymentStorage.get())
+      void refetchPending()
     }
 
     window.addEventListener('pageshow', handlePageShow)
     return () => window.removeEventListener('pageshow', handlePageShow)
-  }, [])
+  }, [refetchPending])
 
   const loading = isShopLoading && !shop
 
@@ -516,6 +523,8 @@ export default function ShopPage() {
 
   function handleInitiatePackageCheckout(paymentPackage: ShopDiamondPackage) {
     if (checkoutInFlightRef.current) return
+    if (pendingPayment) { navigate('/payments/history'); return }
+    if (pendingLoading || pendingError) return
     setCheckoutError('')
     setSelectedPackage(paymentPackage)
   }
@@ -528,6 +537,7 @@ export default function ShopPage() {
 
   async function handleConfirmPackageCheckout() {
     if (!selectedPackage || checkoutInFlightRef.current) return
+    if (pendingPayment) { navigate('/payments/history'); return }
 
     checkoutInFlightRef.current = true
     setCheckoutPackageId(selectedPackage.id)
@@ -542,11 +552,16 @@ export default function ShopPage() {
         createdAt: new Date().toISOString(),
       }
       pendingPaymentStorage.save(nextPendingPayment)
-      setPendingPayment(nextPendingPayment)
+      void paymentQueryClient.invalidateQueries({ queryKey: ['payments'] })
       browserNavigation.assign(checkout.paymentUrl)
       redirectStarted = true
     } catch (error) {
       setCheckoutError(getPaymentErrorMessage(error))
+      if ((error as { code?: string }).code === 'PAYMENT_PENDING_EXISTS') {
+        await refetchPending()
+        setSelectedPackage(null)
+        navigate('/payments/history', { state: { paymentNotice: getPaymentErrorMessage(error) } })
+      }
       void queryClient.invalidateQueries({ queryKey: ['shop'] })
     } finally {
       if (!redirectStarted) {
@@ -629,10 +644,13 @@ export default function ShopPage() {
               <strong>Có giao dịch đang chờ xác nhận</strong>
               <span>Mã {pendingPayment.transactionCode}</span>
             </div>
-            <button type="button" onClick={() => navigate('/payment/result')}>KIỂM TRA KẾT QUẢ</button>
+            <button type="button" onClick={() => navigate('/payments/history')}>THANH TOÁN HOẶC HỦY</button>
           </aside>
         )}
 
+        {pendingError && <div role="alert">Không thể kiểm tra giao dịch đang chờ.
+          <button type="button" onClick={() => void refetchPending()}>Kiểm tra lại</button>
+        </div>}
         {/* Loading skeleton or error */}
         {loading && (
           <div className="shop-loading-skeleton" aria-live="polite">
@@ -841,7 +859,7 @@ export default function ShopPage() {
                   <button
                     type="button"
                     className="shop-gem-btn shop-gem-btn--active"
-                    disabled={checkoutPackageId !== null}
+                    disabled={checkoutPackageId !== null || pendingLoading || pendingError || Boolean(pendingPayment)}
                     onClick={() => handleInitiatePackageCheckout(pkg)}
                   >
                     {checkoutPackageId === pkg.id ? 'ĐANG XỬ LÝ…' : 'MUA NGAY'}

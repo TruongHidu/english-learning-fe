@@ -6,9 +6,19 @@ import type {
   PaymentDetailApiResponse,
   PaymentHistory,
   PaymentHistoryApiResponse,
+  PendingPaymentApiResponse,
 } from '../types/payment.types'
 
 export const paymentService = {
+  async getPendingPayment(signal?: AbortSignal): Promise<PaymentDetail | null> {
+    return (await api.get<PendingPaymentApiResponse>('/payments/pending', { signal })).data.data
+  },
+  async retryPayment(paymentId: string): Promise<CheckoutResponse> {
+    return (await api.post<CheckoutApiResponse>(`/payments/${encodeURIComponent(paymentId)}/retry`, {}, { timeout: 15_000 })).data.data
+  },
+  async cancelPayment(paymentId: string): Promise<PaymentDetail> {
+    return (await api.post<PaymentDetailApiResponse>(`/payments/${encodeURIComponent(paymentId)}/cancel`, {}, { timeout: 15_000 })).data.data
+  },
   async checkout(packageId: string): Promise<CheckoutResponse> {
     const response = await api.post<CheckoutApiResponse>(
       '/payments/vnpay/checkout',

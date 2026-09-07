@@ -1,20 +1,89 @@
-import { useState } from 'react'
-import { keepPreviousData, useQuery } from '@tanstack/react-query'
-import { Link } from 'react-router-dom'
+import { useEffect, useRef, useState } from 'react'
+import { keepPreviousData, useQuery, useQueryClient } from '@tanstack/react-query'
+import { Link, useLocation } from 'react-router-dom'
 import { paymentService } from '../../services/payment.service'
 import { formatPaymentDate, formatVnd, PAYMENT_STATUS_LABELS } from '../../utils/payment'
 import { getPaymentErrorMessage } from '../../utils/payment-errors'
 import './PaymentPages.css'
+import ConfirmModal from '../../components/admin/ConfirmModal'
+import type { PaymentDetail } from '../../types/payment.types'
+import { pendingPaymentStorage } from '../../utils/pending-payment'
+import { browserNavigation } from '../../utils/browser-navigation'
+import { usePaymentDeadline } from '../../hooks/usePaymentDeadline'
 
 const PAGE_SIZE = 20
 
 export default function PaymentHistoryPage() {
+  const location = useLocation()
+  const queryClient = useQueryClient()
+  const [cancelTarget, setCancelTarget] = useState<PaymentDetail | null>(null)
+  const [busyId, setBusyId] = useState<string | null>(null)
+  const inFlight = useRef(false)
+  const [notice, setNotice] = useState(() => typeof location.state?.paymentNotice === 'string' ? location.state.paymentNotice : '')
+  const [actionError, setActionError] = useState('')
   const [page, setPage] = useState(1)
   const { data, error, isLoading, isFetching, refetch } = useQuery({
     queryKey: ['payments', 'me', page, PAGE_SIZE],
     queryFn: ({ signal }) => paymentService.getHistory(page, PAGE_SIZE, signal),
     placeholderData: keepPreviousData,
   })
+  const pending = data?.payments.find(payment => payment.status === 'PENDING')
+  useEffect(() => {
+    for (const payment of data?.payments ?? []) {
+      if (payment.status !== 'PENDING') pendingPaymentStorage.clearIfMatches(payment.paymentId)
+    }
+  }, [data])
+  useEffect(() => {
+    const reset = () => { inFlight.current = false; setBusyId(null); void refetch() }
+    window.addEventListener('pageshow', reset)
+    return () => window.removeEventListener('pageshow', reset)
+  }, [refetch])
+  const remaining = usePaymentDeadline(pending?.paymentId, pending?.expiresAt, () => {
+    void queryClient.invalidateQueries({ queryKey: ['payments'] })
+  })
+
+  async function refreshPayments() {
+    await queryClient.invalidateQueries({ queryKey: ['payments'] })
+  }
+  async function retryPayment(payment: PaymentDetail) {
+    if (inFlight.current) return
+    inFlight.current = true
+    setBusyId(payment.paymentId)
+    setActionError('')
+    setNotice('')
+    let redirected = false
+    try {
+      const result = await paymentService.retryPayment(payment.paymentId)
+      pendingPaymentStorage.save({ paymentId: result.paymentId, transactionCode: result.transactionCode,
+        createdAt: payment.createdAt })
+      await refreshPayments()
+      browserNavigation.assign(result.paymentUrl)
+      redirected = true
+    } catch (error) {
+      setActionError(getPaymentErrorMessage(error))
+      await refreshPayments()
+    } finally {
+      if (!redirected) { inFlight.current = false; setBusyId(null) }
+    }
+  }
+  async function cancelPayment() {
+    if (!cancelTarget || inFlight.current) return
+    inFlight.current = true
+    setBusyId(cancelTarget.paymentId)
+    setActionError('')
+    setNotice('')
+    try {
+      const result = await paymentService.cancelPayment(cancelTarget.paymentId)
+      pendingPaymentStorage.clearIfMatches(result.paymentId)
+      setNotice(result.status === 'EXPIRED' ? 'Giao dịch đã hết hạn' : 'Đã hủy giao dịch')
+      setCancelTarget(null)
+      await refreshPayments()
+    } catch (error) {
+      setActionError(getPaymentErrorMessage(error))
+      setCancelTarget(null)
+      await refreshPayments()
+    } finally { inFlight.current = false; setBusyId(null) }
+  }
 
   return (
     <main className="payment-history-page">
@@ -26,6 +95,12 @@ export default function PaymentHistoryPage() {
         </div>
         <Link to="/shop" className="payment-primary-button">Mua kim cương</Link>
       </header>
+      {notice && <p role="status" aria-live="polite">{notice}</p>}
+      {actionError && <p role="alert">{actionError}</p>}
+      <ConfirmModal isOpen={Boolean(cancelTarget)} title="Hủy giao dịch?"
+        message={`Hủy giao dịch ${cancelTarget?.transactionCode ?? ''}? Bạn sẽ phải tạo giao dịch mới nếu muốn mua lại. Nếu bạn đã hoàn tất thanh toán trên VNPay, hãy quay về trang kết quả trước.`}
+        confirmLabel="Xác nhận hủy" cancelLabel="Quay lại" isLoading={busyId !== null}
+        onConfirm={() => void cancelPayment()} onClose={() => { if (!inFlight.current) setCancelTarget(null) }} />
 
       {isLoading ? (
         <div className="payment-list-state" role="status">
@@ -84,6 +159,20 @@ export default function PaymentHistoryPage() {
                         </span>
                       </td>
                       <td>
+                        {payment.status === 'PENDING' && (
+                          <div className="payment-pending-actions" aria-busy={busyId === payment.paymentId}>
+                            <span>Hết hạn: {formatPaymentDate(payment.expiresAt)}</span>
+                            <span>Còn lại: {String(Math.floor(remaining / 60)).padStart(2, '0')}:{String(remaining % 60).padStart(2, '0')}</span>
+                            <button type="button" className="payment-primary-button"
+                              aria-label={`Thanh toán lại ${payment.transactionCode}`}
+                              disabled={busyId !== null || remaining <= 0 || isFetching}
+                              onClick={() => void retryPayment(payment)}>Thanh toán lại</button>
+                            <button type="button" className="payment-secondary-button"
+                              aria-label={`Hủy giao dịch ${payment.transactionCode}`}
+                              disabled={busyId !== null || isFetching}
+                              onClick={() => setCancelTarget(payment)}>Hủy giao dịch</button>
+                          </div>
+                        )}
                         <Link className="payment-detail-link" to={`/payments/${payment.paymentId}`}>
                           Chi tiết
                         </Link>

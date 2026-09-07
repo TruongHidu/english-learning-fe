@@ -2,7 +2,7 @@ import type { ReactElement } from 'react'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { act, render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import { MemoryRouter } from 'react-router-dom'
+import { MemoryRouter, Route, Routes } from 'react-router-dom'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import type { ShopData } from '../../types/shop.types'
 import { PENDING_PAYMENT_STORAGE_KEY } from '../../utils/pending-payment'
@@ -12,6 +12,7 @@ const mocks = vi.hoisted(() => ({
   getShop: vi.fn(),
   purchaseHeart: vi.fn(),
   checkout: vi.fn(),
+  getPendingPayment: vi.fn(),
   assign: vi.fn(),
   updateCachedUser: vi.fn(),
 }))
@@ -20,7 +21,7 @@ vi.mock('../../services/shop.service', () => ({
   shopService: { getShop: mocks.getShop, purchaseHeart: mocks.purchaseHeart },
 }))
 vi.mock('../../services/payment.service', () => ({
-  paymentService: { checkout: mocks.checkout },
+  paymentService: { checkout: mocks.checkout, getPendingPayment: mocks.getPendingPayment },
 }))
 vi.mock('../../utils/browser-navigation', () => ({
   browserNavigation: { assign: mocks.assign },
@@ -69,7 +70,10 @@ function renderShop(): ReactElement {
   })
   const view = (
     <QueryClientProvider client={queryClient}>
-      <MemoryRouter><ShopPage /></MemoryRouter>
+      <MemoryRouter><Routes>
+        <Route path="/" element={<ShopPage />} />
+        <Route path="/payments/history" element={<h1>Lịch sử thanh toán</h1>} />
+      </Routes></MemoryRouter>
     </QueryClientProvider>
   )
   render(view)
@@ -80,6 +84,7 @@ describe('ShopPage - thanh toán kim cương', () => {
   beforeEach(() => {
     vi.clearAllMocks()
     mocks.getShop.mockResolvedValue(shopFixture)
+    mocks.getPendingPayment.mockResolvedValue(null)
   })
 
   it('render gói theo orderIndex và định dạng giá VND', async () => {
@@ -90,6 +95,30 @@ describe('ShopPage - thanh toán kim cương', () => {
     expect(packageNames.map((item) => item.textContent)).toEqual(['Túi Đá Quý', 'Rương Đá Quý'])
     expect(screen.getByText((text) => text.includes('19.000') && text.includes('₫'))).toBeInTheDocument()
     expect(screen.getByText('+20 💎 thưởng')).toBeInTheDocument()
+  })
+
+  it('pending from backend blocks checkout even without sessionStorage', async () => {
+    mocks.getPendingPayment.mockResolvedValue({ paymentId: 'a'.repeat(24), transactionCode: 'PAY-PENDING',
+      status: 'PENDING', expiresAt: new Date(Date.now() + 600_000).toISOString() })
+    renderShop()
+    await screen.findByText('Mã PAY-PENDING')
+    for (const button of screen.getAllByRole('button', { name: 'MUA NGAY' })) expect(button).toBeDisabled()
+    expect(mocks.checkout).not.toHaveBeenCalled()
+    const user = userEvent.setup()
+    await user.click(screen.getByRole('button', { name: 'THANH TOÁN HOẶC HỦY' }))
+    expect(screen.getByRole('heading', { name: 'Lịch sử thanh toán' })).toBeInTheDocument()
+  })
+
+  it('checkout conflict refreshes pending and navigates to history', async () => {
+    mocks.checkout.mockRejectedValue({ code: 'PAYMENT_PENDING_EXISTS', message: 'Bạn đang có giao dịch chưa hoàn thành' })
+    renderShop()
+    const user = userEvent.setup()
+    await screen.findByText('Túi Đá Quý')
+    await user.click(screen.getAllByRole('button', { name: 'MUA NGAY' })[0])
+    await user.click(screen.getByRole('button', { name: 'TIẾP TỤC VỚI VNPAY' }))
+    expect(await screen.findByRole('heading', { name: 'Lịch sử thanh toán' })).toBeInTheDocument()
+    expect(mocks.assign).not.toHaveBeenCalled()
+    expect(mocks.getPendingPayment.mock.calls.length).toBeGreaterThanOrEqual(2)
   })
 
   it('chặn double click, lưu paymentId trước khi redirect', async () => {

@@ -277,3 +277,5 @@
 @media (prefers-reduced-motion: reduce) {
   .payment-spinner { animation-duration: 1600ms; }
 }
+.payment-pending-actions { display: flex; flex-direction: column; gap: 8px; min-width: 175px; padding-bottom: 8px; }
+.payment-pending-actions button:disabled { opacity: .5; cursor: not-allowed; }

@@ -1,3 +1,5 @@
+import { useEffect, useRef } from 'react'
+
 interface ConfirmModalProps {
   isOpen: boolean
   title: string
@@ -21,6 +23,28 @@ export default function ConfirmModal({
   onConfirm,
   onClose,
 }: ConfirmModalProps) {
+  const dialogRef = useRef<HTMLDivElement>(null)
+  const closeRef = useRef(onClose)
+  const loadingRef = useRef(isLoading)
+  useEffect(() => { closeRef.current = onClose; loadingRef.current = isLoading }, [onClose, isLoading])
+  useEffect(() => {
+    if (!isOpen) return
+    const previous = document.activeElement as HTMLElement | null
+    const dialog = dialogRef.current
+    dialog?.querySelector<HTMLButtonElement>('button')?.focus()
+    function handleKey(event: KeyboardEvent) {
+      if (event.key === 'Escape' && !loadingRef.current) { event.preventDefault(); closeRef.current() }
+      if (event.key !== 'Tab') return
+      const buttons = dialog?.querySelectorAll<HTMLButtonElement>('button:not(:disabled)')
+      if (!buttons?.length) { event.preventDefault(); return }
+      const first = buttons[0]
+      const last = buttons[buttons.length - 1]
+      if (event.shiftKey && document.activeElement === first) { event.preventDefault(); last.focus() }
+      else if (!event.shiftKey && document.activeElement === last) { event.preventDefault(); first.focus() }
+    }
+    dialog?.addEventListener('keydown', handleKey)
+    return () => { dialog?.removeEventListener('keydown', handleKey); previous?.focus() }
+  }, [isOpen])
   if (!isOpen) return null
 
   const variantStyles = {
@@ -36,6 +60,7 @@ export default function ConfirmModal({
     <div
       className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs animate-in fade-in duration-150"
       role="dialog"
+      ref={dialogRef}
       aria-modal="true"
       aria-labelledby="confirm-modal-title"
     >

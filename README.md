@@ -27,6 +27,23 @@ Frontend không chứa và không cần VNPay secret. Mọi chữ ký, số ti�
 - Lịch sử giao dịch: `/payments/history`
 - Chi tiết giao dịch nội bộ: `/payments/:paymentId`
 
+Mỗi user có tối đa một PENDING. Shop gọi GET /payments/pending để lấy trạng thái từ
+backend, chặn mua gói mới và dẫn tới lịch sử nếu còn giao dịch đang chờ.
+Trong lịch sử, PENDING có countdown mm:ss, hạn thanh toán và hai nút:
+
+- Thanh toán lại: POST /payments/:paymentId/retry với body {}, backend kiểm tra hạn,
+  gia hạn từ giờ server thêm 10 phút, giữ mã/snapshot và trả URL VNPay mới. Lưu ID vào
+  sessionStorage trước redirect; không tạo payment mới.
+- Hủy giao dịch: xác nhận bằng modal, POST /payments/:paymentId/cancel, cập nhật
+  CANCELLED hoặc EXPIRED và chỉ xóa pending storage có ID khớp.
+
+Countdown chỉ để hiển thị, không gửi thời gian/giá lên API. Khi chạm 0, tải lại một lần
+cho mỗi deadline; không gọi API mỗi giây. PAYMENT_EXPIRED/PAYMENT_NOT_PENDING tải lại
+lịch sử, không redirect. Các action chống double-click. Query payments được invalidate
+sau thay đổi, giữ trang phân trang hiện tại. Terminal không có nút retry/cancel.
+EXPIRED là tự hết hạn, CANCELLED là hủy. Muốn mua lại phải tạo checkout mới.
+Nút “Kiểm tra lại” ở trang kết quả chỉ đọc DB, khác với “Thanh toán lại” trong lịch sử.
+
 Khi người dùng xác nhận mua, frontend chỉ gửi `{ "packageId": "..." }` tới `POST /payments/vnpay/checkout`. Sau khi nhận kết quả, frontend lưu `paymentId`, `transactionCode` và thời điểm tạo vào `sessionStorage` với key `english-learning.pending-payment`, rồi chuyển trình duyệt tới `paymentUrl` bằng `window.location.assign`.
 
 Backend xử lý Return URL và commit kết quả trước khi redirect về frontend. Trang kết quả không
@@ -51,7 +68,9 @@ trên cùng máy với backend. Không cần IPN/tunnel cho cấu hình local n�
 chữ ký và cập nhật giao dịch trước khi redirect về http://localhost:5173/payment/result.
 
 Luồng chỉ dành cho môn học/sandbox. Không có IPN/queryDR/đối soát; nếu đóng tab hoặc mất mạng
-trước Return, giao dịch có thể vẫn PENDING dù đã thanh toán. Không dùng cho production.
+trước Return, giao dịch có thể tự chuyển EXPIRED dù đã thanh toán. Return SUCCESS hợp lệ
+đến muộn vẫn được backend xác nhận và cộng đúng một lần sau CANCELLED/EXPIRED.
+Hủy local không thu hồi được URL VNPay đã mở. Không dùng cho production.
 
 ## Test thủ công với VNPay Sandbox
 
