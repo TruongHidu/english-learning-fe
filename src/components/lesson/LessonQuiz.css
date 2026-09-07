@@ -66,6 +66,10 @@
   margin-top: 24px;
 }
 
+.lesson-translation {
+  margin-top: 24px;
+}
+
 .lesson-fill-blank__label {
   display: block;
   margin-bottom: 10px;
@@ -90,6 +94,12 @@
   outline: none;
   transition: color 140ms ease, background 140ms ease, border-color 140ms ease,
     box-shadow 140ms ease;
+}
+
+.lesson-translation__input {
+  min-height: 112px;
+  resize: vertical;
+  line-height: 1.5;
 }
 
 .lesson-fill-blank__input::placeholder {

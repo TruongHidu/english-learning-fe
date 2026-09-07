@@ -18,10 +18,22 @@ export interface ShopItem {
   disabledReason: ShopDisabledReason
 }
 
+export interface ShopDiamondPackage {
+  id: string
+  name: string
+  diamondAmount: number
+  bonusDiamond: number
+  totalDiamond: number
+  price: number
+  currency: 'VND'
+  description?: string
+  orderIndex: number
+}
+
 export interface ShopData {
   user: ShopUserBalance
   items: ShopItem[]
-  diamondPackages: unknown[]
+  diamondPackages: ShopDiamondPackage[]
 }
 
 export interface PurchaseHeartData {

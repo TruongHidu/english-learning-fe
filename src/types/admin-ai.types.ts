@@ -20,6 +20,7 @@ export type AiSupportedQuestionType =
   | 'MATCHING'
   | 'FILL_BLANK'
   | 'ORDER_SENTENCE'
+  | 'TRANSLATION'
 
 export interface GeneratedVocabularyCandidate {
   candidateKey: string
@@ -101,11 +102,17 @@ export interface OrderSentenceQuestionCandidate extends QuestionCandidateBase {
   options: GeneratedQuestionOption[]
 }
 
+export interface TranslationQuestionCandidate extends QuestionCandidateBase {
+  type: 'TRANSLATION'
+  correctAnswer: string
+}
+
 export type GeneratedQuestionCandidate =
   | MultipleChoiceQuestionCandidate
   | FillBlankQuestionCandidate
   | MatchingQuestionCandidate
   | OrderSentenceQuestionCandidate
+  | TranslationQuestionCandidate
 
 export interface GenerateQuestionPreviewRequest {
   lessonId?: string
