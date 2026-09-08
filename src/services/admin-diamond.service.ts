@@ -24,6 +24,65 @@ export interface AdminUsersResponse {
   }
 }
 
+export interface AdminUserDetail {
+  id: string
+  name: string
+  email: string
+  role: 'USER' | 'ADMIN'
+  status: 'ACTIVE' | 'LOCKED' | 'BANNED'
+  avatarUrl: string | null
+  authProvider: string
+  diamond: number
+  currentHeart: number
+  maxHeart: number
+  totalXp: number
+  level: number
+  currentStreak: number
+  longestStreak: number
+  lastStudyDate: string | null
+  lastLoginAt: string | null
+  createdAt: string
+  updatedAt: string
+}
+
+export interface AdminUserCourseProgress {
+  courseId: string
+  courseName: string
+  level: string
+  thumbnailUrl: string | null
+  totalLessons: number
+  completedLessons: number
+  progressPercent: number
+}
+
+export interface AdminUserProgressData {
+  totalCompletedLessons: number
+  courses: AdminUserCourseProgress[]
+}
+
+export interface AdminUserVocabularyItem {
+  id: string
+  word: string
+  meaning: string
+  phonetic: string
+  partOfSpeech: string
+  difficulty: string
+  status: 'LEARNED' | 'MASTERED'
+  reviewLevel: number
+  reviewCount: number
+  correctCount: number
+  incorrectCount: number
+  learnedAt: string
+  lastReviewedAt: string | null
+}
+
+export interface AdminUserVocabulariesData {
+  vocabularies: AdminUserVocabularyItem[]
+  total: number
+  page: number
+  totalPages: number
+}
+
 export interface AdminAdjustDiamondPayload {
   amount: number
   reason: string
@@ -79,6 +138,29 @@ export interface AdminDiamondTransactionsResponse {
 export const adminDiamondService = {
   async getUsers(params?: { q?: string; status?: string; page?: number; limit?: number }) {
     const res = await api.get<AdminUsersResponse>('/admin/users', { params })
+    return res.data.data
+  },
+
+  async getUserDetail(userId: string) {
+    const res = await api.get<{ success: boolean; data: { user: AdminUserDetail } }>(`/admin/users/${userId}`)
+    return res.data.data.user
+  },
+
+  async getUserProgress(userId: string) {
+    const res = await api.get<{ success: boolean; data: AdminUserProgressData }>(`/admin/users/${userId}/progress`)
+    return res.data.data
+  },
+
+  async getUserVocabularies(userId: string, params?: { page?: number; limit?: number }) {
+    const res = await api.get<{ success: boolean; data: AdminUserVocabulariesData }>(`/admin/users/${userId}/vocabularies`, { params })
+    return res.data.data
+  },
+
+  async updateUserStatus(userId: string, status: 'ACTIVE' | 'LOCKED' | 'BANNED', reason?: string) {
+    const res = await api.patch<{ success: boolean; data: { id: string; name: string; email: string; status: 'ACTIVE' | 'LOCKED' | 'BANNED'; role: string } }>(
+      `/admin/users/${userId}/status`,
+      { status, reason }
+    )
     return res.data.data
   },
 

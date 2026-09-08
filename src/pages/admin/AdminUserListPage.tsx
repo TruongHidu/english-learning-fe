@@ -4,6 +4,7 @@ import DataTable from '../../components/admin/DataTable'
 import PageHeader from '../../components/admin/PageHeader'
 import SearchInput from '../../components/admin/SearchInput'
 import StatusBadge from '../../components/admin/StatusBadge'
+import ConfirmModal from '../../components/admin/ConfirmModal'
 import AdjustDiamondModal from '../../components/admin/AdjustDiamondModal'
 import {
   adminDiamondService,
@@ -26,6 +27,13 @@ export default function AdminUserListPage() {
   // Modal adjust diamond
   const [selectedUser, setSelectedUser] = useState<AdminUserItem | null>(null)
   const [isAdjusting, setIsAdjusting] = useState(false)
+
+  // Modal Lock/Unlock user status
+  const [userToToggleStatus, setUserToToggleStatus] = useState<{
+    user: AdminUserItem
+    targetStatus: 'ACTIVE' | 'LOCKED'
+  } | null>(null)
+  const [isTogglingStatus, setIsTogglingStatus] = useState(false)
 
   const fetchUsers = useCallback(async () => {
     try {
@@ -80,7 +88,6 @@ export default function AdminUserListPage() {
         }
       }
       setSelectedUser(null)
-      // Refresh current user in list
       fetchUsers()
       setTimeout(() => setSuccessMessage(null), 6000)
     } catch (err: any) {
@@ -90,11 +97,32 @@ export default function AdminUserListPage() {
     }
   }
 
+  const handleToggleStatusConfirm = async () => {
+    if (!userToToggleStatus) return
+    const { user, targetStatus } = userToToggleStatus
+    try {
+      setIsTogglingStatus(true)
+      await adminDiamondService.updateUserStatus(user.id, targetStatus)
+      setUsers((prev) =>
+        prev.map((u) => (u.id === user.id ? { ...u, status: targetStatus } : u))
+      )
+      setSuccessMessage(
+        `Đã ${targetStatus === 'LOCKED' ? 'khóa' : 'mở khóa'} tài khoản ${user.email} thành công.`
+      )
+      setUserToToggleStatus(null)
+      setTimeout(() => setSuccessMessage(null), 5000)
+    } catch (err: any) {
+      alert(err?.response?.data?.message || 'Không thể cập nhật trạng thái người dùng.')
+    } finally {
+      setIsTogglingStatus(false)
+    }
+  }
+
   return (
     <div className="admin-page">
       <PageHeader
         title="Người dùng"
-        description="Theo dõi tài khoản, số dư kim cương và tình trạng học tập của người dùng."
+        description="Theo dõi tài khoản, số dư kim cương, trạng thái khóa và tình trạng học tập của người dùng."
       />
 
       {successMessage ? (
@@ -148,9 +176,9 @@ export default function AdminUserListPage() {
           aria-label="Lọc trạng thái"
         >
           <option value="">Tất cả trạng thái</option>
-          <option value="ACTIVE">Hoạt động</option>
-          <option value="LOCKED">Đã khóa</option>
-          <option value="BANNED">Đã cấm</option>
+          <option value="ACTIVE">Hoạt động (ACTIVE)</option>
+          <option value="LOCKED">Đã khóa (LOCKED)</option>
+          <option value="BANNED">Đã cấm (BANNED)</option>
         </select>
         <div className="ml-auto text-xs text-slate-500 font-semibold self-center">
           Tổng số: <strong className="text-slate-800">{totalUsers}</strong> tài khoản
@@ -217,6 +245,30 @@ export default function AdminUserListPage() {
                   >
                     Chi tiết
                   </Link>
+                  <button
+                    type="button"
+                    disabled={user.role === 'ADMIN'}
+                    onClick={() =>
+                      setUserToToggleStatus({
+                        user,
+                        targetStatus: user.status === 'LOCKED' ? 'ACTIVE' : 'LOCKED',
+                      })
+                    }
+                    className={`admin-button admin-button--small ${
+                      user.status === 'LOCKED'
+                        ? 'admin-button--primary'
+                        : 'admin-button--danger'
+                    }`}
+                    title={
+                      user.role === 'ADMIN'
+                        ? 'Không thể khóa tài khoản Quản trị viên'
+                        : user.status === 'LOCKED'
+                        ? 'Mở khóa tài khoản này'
+                        : 'Khóa tài khoản này'
+                    }
+                  >
+                    {user.status === 'LOCKED' ? 'Mở khóa' : 'Khóa'}
+                  </button>
                 </span>
               </td>
             </tr>
@@ -258,6 +310,32 @@ export default function AdminUserListPage() {
         isLoading={isAdjusting}
         onConfirm={handleAdjustDiamonds}
         onClose={() => setSelectedUser(null)}
+      />
+
+      {/* Modal Confirm Lock/Unlock */}
+      <ConfirmModal
+        isOpen={Boolean(userToToggleStatus)}
+        title={
+          userToToggleStatus?.targetStatus === 'LOCKED'
+            ? 'Khóa tài khoản người dùng'
+            : 'Mở khóa tài khoản người dùng'
+        }
+        message={
+          userToToggleStatus?.targetStatus === 'LOCKED'
+            ? `Bạn có chắc chắn muốn KHÓA tài khoản “${userToToggleStatus?.user.name}” (${userToToggleStatus?.user.email})? Người dùng sẽ không thể đăng nhập vào hệ thống.`
+            : `Bạn có muốn MỞ KHÓA tài khoản “${userToToggleStatus?.user.name}” (${userToToggleStatus?.user.email}) để người dùng đăng nhập và học tập bình thường?`
+        }
+        confirmLabel={
+          userToToggleStatus?.targetStatus === 'LOCKED'
+            ? 'Xác nhận khóa'
+            : 'Xác nhận mở khóa'
+        }
+        confirmVariant={
+          userToToggleStatus?.targetStatus === 'LOCKED' ? 'danger' : 'primary'
+        }
+        isLoading={isTogglingStatus}
+        onConfirm={() => void handleToggleStatusConfirm()}
+        onClose={() => setUserToToggleStatus(null)}
       />
     </div>
   )
