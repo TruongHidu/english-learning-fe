@@ -12,6 +12,7 @@ interface StatusBadgeProps {
     | 'SUCCESS'
     | 'FAILED'
     | 'CANCELLED'
+    | 'EXPIRED'
   size?: 'sm' | 'md'
 }
 
@@ -45,7 +46,9 @@ const statusConfig: Record<AdminStatus, { label: string; className: string }> = 
   SUCCESS: { label: 'THÀNH CÔNG', className: 'admin-status--success' },
   FAILED: { label: 'THẤT BẠI', className: 'admin-status--danger' },
   CANCELLED: { label: 'ĐÃ HỦY', className: 'admin-status--neutral' },
+  EXPIRED: { label: 'HẾT HẠN', className: 'admin-status--neutral' },
 }
+
 
 
 export default function StatusBadge({ status, size = 'sm' }: StatusBadgeProps) {
