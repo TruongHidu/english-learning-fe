@@ -1,10 +1,3 @@
-export const mockDashboardStats = [
-  { label: 'Tổng người dùng', value: '1.250', note: '+8,2% so với tháng trước', tone: 'blue' as const },
-  { label: 'Khóa học', value: '5', note: '3 khóa học đã xuất bản', tone: 'green' as const },
-  { label: 'Màn học', value: '120', note: '18 màn học đang soạn', tone: 'violet' as const },
-  { label: 'Doanh thu', value: '12.500.000 ₫', note: '+11,4% so với tháng trước', tone: 'amber' as const },
-]
-
 export const mockRecentActivities = [
   { id: 'a1', title: 'Khóa học English A1 vừa được cập nhật', time: '12 phút trước', type: 'Nội dung' },
   { id: 'a2', title: '24 người dùng mới đã đăng ký', time: '1 giờ trước', type: 'Người dùng' },

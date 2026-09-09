@@ -17,6 +17,7 @@ import AdminLessonDetailPage from '../pages/admin/AdminLessonDetailPage'
 import AdminPaymentListPage from '../pages/admin/AdminPaymentListPage'
 import AdminQuestionListPage from '../pages/admin/AdminQuestionListPage'
 import AdminRevenuePage from '../pages/admin/AdminRevenuePage'
+import AdminLearningStatsPage from '../pages/admin/AdminLearningStatsPage'
 import AdminTopicDetailPage from '../pages/admin/AdminTopicDetailPage'
 import AdminUserDetailPage from '../pages/admin/AdminUserDetailPage'
 import AdminUserListPage from '../pages/admin/AdminUserListPage'
@@ -120,6 +121,7 @@ function AppRoutes() {
           <Route path="payments" element={<AdminPaymentListPage />} />
           <Route path="payments/packages" element={<AdminDiamondPackagePage />} />
           <Route path="revenue" element={<AdminRevenuePage />} />
+          <Route path="learning-stats" element={<AdminLearningStatsPage />} />
         </Route>
 
         <Route

@@ -68,6 +68,10 @@ export default function AdminSidebar({ isOpen, onClose }: AdminSidebarProps) {
 
         <div className="admin-nav-group">
           <span className="admin-nav-group__label">Quản lý học tập</span>
+          <NavLink to="/admin/learning-stats" className={navLinkClass} onClick={onClose} title="Thống kê học tập">
+            <span className="admin-sidebar__icon"><AdminIcon name="chart" /></span>
+            <span className="admin-sidebar__label">Thống kê học tập</span>
+          </NavLink>
           <NavLink to="/admin/courses" className={() => `admin-sidebar__link${learningRouteActive ? ' admin-sidebar__link--active' : ''}`} onClick={onClose} title="Nội dung học">
             <span className="admin-sidebar__icon"><AdminIcon name="book" /></span>
             <span className="admin-sidebar__label">Nội dung học</span>
