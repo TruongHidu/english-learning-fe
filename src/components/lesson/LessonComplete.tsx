@@ -88,23 +88,42 @@ export default function LessonComplete({ session, courseId, sectionId, rewards, 
       </div>
 
       {/* XP Progress Bar */}
-      {rewards && (
-        <div className="lesson-surface-card mb-6 w-full rounded-2xl p-4">
-          <div className="mb-2 flex items-center justify-between">
-            <span className="text-xs font-black uppercase tracking-wider opacity-70">Cấp độ {rewards.level}</span>
-            <span className="text-xs font-black opacity-70">{rewards.totalXp} XP</span>
+      {rewards && (() => {
+        const currentLevel = Math.max(1, rewards.level)
+        const currentLevelBaseXp = 50 * currentLevel * (currentLevel - 1)
+        const nextLevelBaseXp = 50 * (currentLevel + 1) * currentLevel
+        const xpNeededForNextLevel = nextLevelBaseXp - currentLevelBaseXp
+        const xpInCurrentLevel = Math.max(0, rewards.totalXp - currentLevelBaseXp)
+        const levelProgressPercentage = Math.min(
+          100,
+          Math.max(
+            0,
+            Math.round((xpInCurrentLevel / xpNeededForNextLevel) * 100),
+          ),
+        )
+        const xpRemainingForNextLevel = Math.max(
+          0,
+          xpNeededForNextLevel - xpInCurrentLevel,
+        )
+
+        return (
+          <div className="lesson-surface-card mb-6 w-full rounded-2xl p-4">
+            <div className="mb-2 flex items-center justify-between">
+              <span className="text-xs font-black uppercase tracking-wider opacity-70">Cấp độ {rewards.level}</span>
+              <span className="text-xs font-black opacity-70">{xpInCurrentLevel} / {xpNeededForNextLevel} XP</span>
+            </div>
+            <div className="h-3 w-full overflow-hidden rounded-full bg-gray-200 dark:bg-gray-700">
+              <div
+                className="h-full rounded-full bg-yellow-400 transition-all duration-700"
+                style={{ width: `${levelProgressPercentage}%` }}
+              />
+            </div>
+            <p className="mt-2 text-center text-xs font-bold opacity-60">
+              Còn {xpRemainingForNextLevel} XP để lên cấp {currentLevel + 1}
+            </p>
           </div>
-          <div className="h-3 w-full overflow-hidden rounded-full bg-gray-200 dark:bg-gray-700">
-            <div
-              className="h-full rounded-full bg-yellow-400 transition-all duration-700"
-              style={{ width: `${(rewards.totalXp % 100)}%` }}
-            />
-          </div>
-          <p className="mt-2 text-center text-xs font-bold opacity-60">
-            {100 - (rewards.totalXp % 100)} XP để lên cấp {rewards.level + 1}
-          </p>
-        </div>
-      )}
+        )
+      })()}
 
       {/* Next Lesson Unlocked Banner */}
       {rewards?.isNextLessonUnlocked && (
