@@ -1,3 +1,4 @@
+import { selectActiveLesson } from '../../utils/learning-path'
 import type { LearningPathLesson } from '../../types/learning-path.types'
 import LessonStartPopover from './LessonStartPopover'
 import './LessonPath.css'
@@ -9,10 +10,12 @@ interface LessonPathProps {
   onStartLesson?: (lesson: LearningPathLesson) => void
   onDismissLesson?: () => void
   onViewVocab?: (lesson: LearningPathLesson) => void
+  /** Lets a parent containing several topic paths choose one global recommendation. */
+  startBadgeLessonId?: string | null
 }
 
 function getLessonStatusLabel(lesson: LearningPathLesson): string {
-  if (lesson.isLocked && lesson.isCompleted) return 'Đã hoàn thành trước đây · Hiện bị khóa'
+  if (lesson.hasNewContent) return 'Đã hoàn thành · Có nội dung mới'
   if (lesson.isLocked) return 'Chưa mở khóa'
   if (lesson.isCompleted) return 'Đã hoàn thành'
   if (lesson.progressStatus === 'IN_PROGRESS') return 'Đang học'
@@ -33,6 +36,12 @@ function LessonIcon({ lesson }: { lesson: LearningPathLesson }) {
   return <span aria-hidden="true">★</span>
 }
 
+function getActionBadgeLabel(lesson: LearningPathLesson): string {
+  if (lesson.hasNewContent) return 'Ôn mới'
+  if (lesson.progressStatus === 'IN_PROGRESS') return 'Tiếp tục'
+  return 'Bắt đầu'
+}
+
 export default function LessonPath({
   lessons,
   onSelectLesson,
@@ -40,6 +49,7 @@ export default function LessonPath({
   onStartLesson,
   onDismissLesson,
   onViewVocab,
+  startBadgeLessonId,
 }: LessonPathProps) {
   if (lessons.length === 0) {
     return (
@@ -49,9 +59,9 @@ export default function LessonPath({
     )
   }
 
-  const firstActionableLessonId = lessons.find(
-    (lesson) => !lesson.isLocked && !lesson.isCompleted,
-  )?.id
+  const recommendedLessonId = startBadgeLessonId === undefined
+    ? selectActiveLesson(lessons)?.id
+    : startBadgeLessonId
 
   return (
     <ol className="lesson-path-list" aria-label="Danh sách bài học">
@@ -70,8 +80,10 @@ export default function LessonPath({
             {index > 0 ? <span className="lesson-path-connector" aria-hidden="true" /> : null}
 
             <div className="lesson-path-node-wrap">
-              {lesson.id === firstActionableLessonId ? (
-                <span className="lesson-path-start-badge">Bắt đầu</span>
+              {lesson.id === recommendedLessonId ? (
+                <span className="lesson-path-start-badge">
+                  {getActionBadgeLabel(lesson)}
+                </span>
               ) : null}
               <button
                 type="button"
@@ -99,6 +111,7 @@ export default function LessonPath({
             <article className="learning-surface lesson-path-card">
               <span className="lesson-path-index">Bài {index + 1}</span>
               <h3>{lesson.name}</h3>
+              {lesson.isNewForUser ? <span className="lesson-path-new-badge">Bài mới</span> : null}
               <p>{lesson.description ?? `${lesson.questionCount} câu hỏi`}</p>
               <span className="lesson-path-status">{statusLabel}</span>
               {lesson.isCompleted || lesson.totalAttempts > 0 ? (

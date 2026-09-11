@@ -29,6 +29,11 @@ export interface UserCourseSectionResponse extends SectionResponse {
   progressStatus: ProgressStatus
   isLocked: boolean
   isCompleted: boolean
+  hasAccess?: boolean
+  accessGrantedAt?: string | null
+  isCurrentVersionCompleted?: boolean
+  hasNewContent?: boolean
+  newLessonCount?: number
   completedLessonCount: number
   totalLessonCount: number
 }

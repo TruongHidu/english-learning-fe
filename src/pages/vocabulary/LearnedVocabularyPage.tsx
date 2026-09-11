@@ -1,14 +1,19 @@
 import { useEffect, useState, useMemo } from 'react'
 import { userService } from '../../services/user.service'
 import type { SectionVocabularyGroup, SectionVocabularyItem } from '../../types/user.types'
+import { useReviewStats } from '../../hooks/useVocabularyReview'
+import FlashcardReviewModal from '../../components/vocabulary/FlashcardReviewModal'
 
-export default function LearnedVocabularyPage() {
+export default function LearnedVocabularyPage({ learnedOnly = false }: { learnedOnly?: boolean }) {
   const [sections, setSections] = useState<SectionVocabularyGroup[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [searchQuery, setSearchQuery] = useState('')
-  const [statusFilter, setStatusFilter] = useState<'ALL' | 'LEARNED' | 'UNLEARNED'>('ALL')
+  const [statusFilter, setStatusFilter] = useState<'ALL' | 'LEARNED' | 'UNLEARNED'>(learnedOnly ? 'LEARNED' : 'ALL')
   const [playingWord, setPlayingWord] = useState<string | null>(null)
   const [expandedSectionIds, setExpandedSectionIds] = useState<Record<string, boolean>>({})
+  const { stats, refetch: refetchReviewStats } = useReviewStats()
+  const [isReviewMode, setIsReviewMode] = useState(false)
+  const [isForceAll, setIsForceAll] = useState(false)
 
   useEffect(() => {
     async function fetchData() {
@@ -117,27 +122,41 @@ export default function LearnedVocabularyPage() {
             <div className="mb-1 flex items-center gap-2">
               <span className="text-2xl">📚</span>
               <span className="text-xs font-black uppercase tracking-widest text-emerald-100">
-                Kho Từ Vựng Theo Phần Học
+                {learnedOnly ? 'TỪ ĐÃ HỌC THEO TOPIC' : 'Kho Từ Vựng Theo Phần Học'}
               </span>
             </div>
-            <h1 className="text-2xl font-black md:text-3xl">Sổ Từ Vựng</h1>
+            <h1 className="text-2xl font-black md:text-3xl">{learnedOnly ? 'Từ Vựng Đã Học' : 'Sổ Từ Vựng'}</h1>
             <p className="mt-1 text-sm font-bold text-emerald-50">
               Phân loại từ vựng theo từng Phần học & Chủ đề với trạng thái đã học rõ ràng
             </p>
           </div>
-          <div className="flex items-center gap-3 rounded-2xl bg-white/20 px-5 py-3 backdrop-blur-md self-start md:self-auto">
-            <div className="text-center">
-              <span className="block text-2xl font-black">{learnedTotal}</span>
-              <span className="text-[10px] font-black uppercase tracking-wider text-emerald-100">
-                Đã học
-              </span>
-            </div>
-            <div className="h-8 w-px bg-white/30" />
-            <div className="text-center">
-              <span className="block text-2xl font-black">{totalCount}</span>
-              <span className="text-[10px] font-black uppercase tracking-wider text-emerald-100">
-                Tổng số từ
-              </span>
+          <div className="flex flex-wrap items-center gap-3 self-start md:self-auto">
+            <button
+              type="button"
+              onClick={() => {
+                setIsForceAll(stats.dueToday === 0)
+                setIsReviewMode(true)
+              }}
+              disabled={totalCount === 0}
+              className="rounded-2xl bg-white px-4 py-3 text-xs font-black uppercase tracking-wider text-emerald-700 shadow-md transition hover:bg-emerald-50 disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              🃏 Ôn bằng Flashcard
+              {stats.dueToday > 0 && <span className="ml-1">({stats.dueToday})</span>}
+            </button>
+            <div className="flex items-center gap-3 rounded-2xl bg-white/20 px-5 py-3 backdrop-blur-md">
+              <div className="text-center">
+                <span className="block text-2xl font-black">{learnedTotal}</span>
+                <span className="text-[10px] font-black uppercase tracking-wider text-emerald-100">
+                  Đã học
+                </span>
+              </div>
+              <div className="h-8 w-px bg-white/30" />
+              <div className="text-center">
+                <span className="block text-2xl font-black">{totalCount}</span>
+                <span className="text-[10px] font-black uppercase tracking-wider text-emerald-100">
+                  Tổng số từ
+                </span>
+              </div>
             </div>
           </div>
         </div>
@@ -147,6 +166,11 @@ export default function LearnedVocabularyPage() {
       <div className="mb-6 flex flex-col gap-4">
         {/* Status Filter Chips */}
         <div className="flex flex-wrap items-center gap-2 border-b border-gray-200 pb-4 dark:border-gray-800">
+          {learnedOnly ? (
+            <div className="rounded-2xl bg-emerald-600 px-5 py-3 text-xs font-black uppercase tracking-wider text-white shadow-md">
+              🟢 Đã học ({learnedTotal})
+            </div>
+          ) : <>
           <button
             type="button"
             onClick={() => setStatusFilter('ALL')}
@@ -158,6 +182,7 @@ export default function LearnedVocabularyPage() {
           >
             🌟 Tất cả từ vựng ({totalCount})
           </button>
+
           <button
             type="button"
             onClick={() => setStatusFilter('LEARNED')}
@@ -180,6 +205,7 @@ export default function LearnedVocabularyPage() {
           >
             ⚪ Chưa học ({unlearnedTotal})
           </button>
+          </>}
         </div>
 
         {/* Search Bar */}
@@ -301,6 +327,17 @@ export default function LearnedVocabularyPage() {
             )
           })}
         </div>
+      )}
+
+      {isReviewMode && (
+        <FlashcardReviewModal
+          forceAll={isForceAll}
+          onClose={() => {
+            setIsReviewMode(false)
+            setIsForceAll(false)
+            void refetchReviewStats()
+          }}
+        />
       )}
     </main>
   )

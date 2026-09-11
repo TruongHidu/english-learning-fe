@@ -14,10 +14,19 @@ export interface UserTopic {
   progressStatus: ProgressStatus
   isLocked: boolean
   isCompleted: boolean
+  hasAccess?: boolean
+  accessGrantedAt?: string | null
+  isCurrentVersionCompleted?: boolean
+  hasNewContent?: boolean
+  newLessonCount?: number
   completedLessonCount: number
 }
 
 export interface LearningPathLesson {
+  currentVersion?: number
+  completedVersion?: number
+  publishedQuestionCount?: number
+  isNewForUser?: boolean
   id: string
   name: string
   description: string | null
@@ -29,6 +38,11 @@ export interface LearningPathLesson {
   progressStatus: ProgressStatus
   isLocked: boolean
   isCompleted: boolean
+  hasAccess?: boolean
+  accessGrantedAt?: string | null
+  isCurrentVersionCompleted?: boolean
+  hasNewContent?: boolean
+  newLessonCount?: number
   bestScore: number
   totalAttempts: number
 }
@@ -40,6 +54,11 @@ export interface UserTopicSummary {
   progressStatus: ProgressStatus
   isLocked: boolean
   isCompleted: boolean
+  hasAccess?: boolean
+  accessGrantedAt?: string | null
+  isCurrentVersionCompleted?: boolean
+  hasNewContent?: boolean
+  newLessonCount?: number
   completedLessonCount: number
   totalLessonCount: number
 }

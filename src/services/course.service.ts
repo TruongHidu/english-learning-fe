@@ -20,7 +20,10 @@ export const courseService = {
 
   async getPublishedSections(courseId: string): Promise<UserCourseSectionResponse[]> {
     const response = await api.get<GetPublishedSectionsResponse>(`/courses/${courseId}/sections`)
-    return [...response.data.data.sections].sort(
+    return response.data.data.sections.map(section => ({
+      ...section,
+      isLocked: section.hasAccess || section.isCompleted ? false : section.isLocked,
+    })).sort(
       (first, second) => first.orderIndex - second.orderIndex,
     )
   },

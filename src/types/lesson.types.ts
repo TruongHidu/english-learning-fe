@@ -2,6 +2,9 @@ import type { ContentStatus } from './course.types'
 import type { ApiSuccess } from './api.types'
 
 export interface LessonResponse {
+  publishedVersion?: number
+  assignedQuestionCount?: number
+  publishedQuestionCount?: number
   id: string
   topicId: string
   name: string

@@ -23,6 +23,7 @@ export interface LearningQuestion {
 export interface LearningSession {
   id: string
   lessonId: string
+  lessonVersion?: number
   status: 'IN_PROGRESS' | 'COMPLETED' | 'FAILED' | 'ABANDONED'
   heartStart: number
   heartRemaining: number

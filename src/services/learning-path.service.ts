@@ -20,7 +20,11 @@ export const learningPathService = {
     const path = response.data.data
     return {
       ...path,
-      lessons: [...path.lessons].sort(
+      lessons: path.lessons.map(lesson => ({
+        ...lesson,
+        isLocked: lesson.hasAccess || lesson.isCompleted ? false : lesson.isLocked,
+        questionCount: lesson.publishedQuestionCount ?? lesson.questionCount,
+      })).sort(
         (first, second) => first.orderIndex - second.orderIndex,
       ),
     }

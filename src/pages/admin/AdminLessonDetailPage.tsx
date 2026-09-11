@@ -333,14 +333,7 @@ export default function AdminLessonDetailPage() {
         ),
       )
 
-      setLesson((prev) =>
-        prev
-          ? {
-              ...prev,
-              questionCount: Math.max(0, prev.questionCount - 1),
-            }
-          : prev,
-      )
+      setLesson(await adminLessonService.getLessonById(lessonId!))
 
       showNotification('success', 'Đã gỡ câu hỏi khỏi bài học.')
     } catch (err: unknown) {

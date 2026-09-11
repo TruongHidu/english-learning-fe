@@ -33,7 +33,6 @@ export const adminLessonService = {
       name: input.name.trim(),
       description: input.description?.trim() || undefined,
       requiredScore: input.requiredScore,
-      questionCount: input.questionCount,
       xpReward: input.xpReward,
       diamondReward: input.diamondReward,
       orderIndex: input.orderIndex,
@@ -59,7 +58,6 @@ export const adminLessonService = {
     if (input.name !== undefined) body.name = input.name.trim()
     if (input.description !== undefined) body.description = input.description.trim()
     if (input.requiredScore !== undefined) body.requiredScore = input.requiredScore
-    if (input.questionCount !== undefined) body.questionCount = input.questionCount
     if (input.xpReward !== undefined) body.xpReward = input.xpReward
     if (input.diamondReward !== undefined) body.diamondReward = input.diamondReward
     const response = await api.patch<GetAdminLessonResponse>(`/admin/lessons/${lessonId}`, body)

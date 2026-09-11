@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import SectionCard from '../../components/course/SectionCard'
+import { useWindowFocusRefresh } from '../../hooks/useWindowFocusRefresh'
 import { courseService } from '../../services/course.service'
 import type {
   CourseResponse,
@@ -33,6 +34,8 @@ export default function CourseSectionsPage() {
       setIsLoading(false)
     }
   }, [courseId])
+
+  useWindowFocusRefresh(loadData)
 
   useEffect(() => {
     void loadData()

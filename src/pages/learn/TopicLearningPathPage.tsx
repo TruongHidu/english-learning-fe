@@ -2,6 +2,8 @@ import { useCallback, useEffect, useState } from 'react'
 import { useLocation, useNavigate, useParams } from 'react-router-dom'
 import LessonPath from '../../components/learning/LessonPath'
 import GameOverModal from '../../components/lesson/GameOverModal'
+import { useWindowFocusRefresh } from '../../hooks/useWindowFocusRefresh'
+import { containerProgressLabel } from '../../utils/learning-path'
 import { useAuth } from '../../hooks/useAuth'
 import { learningPathService } from '../../services/learning-path.service'
 import type {
@@ -40,6 +42,8 @@ export default function TopicLearningPathPage() {
       setIsLoading(false)
     }
   }, [topicId])
+
+  useWindowFocusRefresh(loadPath)
 
   useEffect(() => {
     void loadPath()
@@ -92,6 +96,9 @@ export default function TopicLearningPathPage() {
             {path.topic.description}
           </p>
         ) : null}
+        {path ? <p className="learning-muted-color mt-2 text-sm">
+          {containerProgressLabel(path.topic)} · {path.topic.completedLessonCount}/{path.topic.totalLessonCount} bài học
+        </p> : null}
       </header>
 
       {isLoading ? (

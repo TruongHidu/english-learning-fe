@@ -9,11 +9,12 @@ import { userService } from '../../services/user.service'
 import type { UserCourseSectionResponse } from '../../types/course.types'
 import type {
   LearningPathLesson,
-  ProgressStatus,
   SectionTopicLearningPath,
 } from '../../types/learning-path.types'
 import type { SectionVocabularyItem, TopicVocabularyGroup } from '../../types/user.types'
 import { getLearningPathErrorMessage } from '../../utils/learning-errors'
+import { selectActiveLesson, containerProgressLabel } from '../../utils/learning-path'
+import { useWindowFocusRefresh } from '../../hooks/useWindowFocusRefresh'
 import { useAuth } from '../../hooks/useAuth'
 
 interface LocationState {
@@ -27,19 +28,6 @@ interface LessonScrollItem {
   lesson: LearningPathLesson
   topicId: string
   topicName: string
-}
-
-function getProgressLabel(status: ProgressStatus): string {
-  switch (status) {
-    case 'COMPLETED':
-      return 'Đã hoàn thành'
-    case 'IN_PROGRESS':
-      return 'Đang học'
-    case 'LOCKED':
-      return 'Đang khóa'
-    default:
-      return 'Sẵn sàng học'
-  }
 }
 
 export default function SectionTopicsPage() {
@@ -81,6 +69,10 @@ export default function SectionTopicsPage() {
     lessonScrollItems.findIndex(({ lesson }) => lesson.id === activeLessonId),
   )
   const activeLessonItem = lessonScrollItems[activeLessonIndex]
+  const recommendedLessonId = useMemo(
+    () => selectActiveLesson(lessonScrollItems.map(({ lesson }) => lesson))?.id ?? null,
+    [lessonScrollItems],
+  )
 
   const loadSectionPath = useCallback(async () => {
     if (!courseId || !sectionId) {
@@ -117,16 +109,8 @@ export default function SectionTopicsPage() {
       }
 
       const nextTopicPaths = await learningPathService.getSectionLearningPath(sectionId)
-      const nextLessonIds = new Set(
-        nextTopicPaths.flatMap(({ lessons }) => lessons.map((lesson) => lesson.id)),
-      )
-
       setTopicPaths(nextTopicPaths)
-      setActiveLessonId((currentLessonId) =>
-        currentLessonId && nextLessonIds.has(currentLessonId)
-          ? currentLessonId
-          : nextTopicPaths[0]?.lessons[0]?.id ?? null,
-      )
+      setActiveLessonId(selectActiveLesson(nextTopicPaths.flatMap(path => path.lessons))?.id ?? null)
     } catch (requestError) {
       const apiError = normalizeApiError(requestError)
       setTopicPaths([])
@@ -151,6 +135,8 @@ export default function SectionTopicsPage() {
       setIsLoading(false)
     }
   }, [courseId, sectionId])
+
+  useWindowFocusRefresh(loadSectionPath)
 
   useEffect(() => {
     void loadSectionPath()
@@ -217,7 +203,6 @@ export default function SectionTopicsPage() {
       animationFrame = window.requestAnimationFrame(updateActiveLesson)
     }
 
-    updateActiveLesson()
     window.addEventListener('scroll', scheduleUpdate, { passive: true })
     window.addEventListener('resize', scheduleUpdate)
 
@@ -341,6 +326,8 @@ export default function SectionTopicsPage() {
             </span>
             {activeLessonItem.lesson.isLocked
               ? 'Đã khóa'
+              : activeLessonItem.lesson.hasNewContent
+                ? 'Ôn nội dung mới'
               : activeLessonItem.lesson.isCompleted
                 ? 'Học lại'
                 : activeLessonItem.lesson.progressStatus === 'IN_PROGRESS'
@@ -426,7 +413,7 @@ export default function SectionTopicsPage() {
                     </p>
                   ) : null}
                   <span className="learning-subtle-color mt-1 inline-block text-[11px] font-black uppercase tracking-wider">
-                    {getProgressLabel(topic.progressStatus)}
+                    {containerProgressLabel(topic)} · {topic.completedLessonCount}/{topic.totalLessonCount} bài học
                   </span>
                 </div>
                 <span className="h-0.5 flex-1 bg-[var(--surface-border)]" aria-hidden="true" />
@@ -434,6 +421,7 @@ export default function SectionTopicsPage() {
 
               <LessonPath
                 lessons={lessons}
+                startBadgeLessonId={recommendedLessonId}
                 onSelectLesson={selectLesson}
                 selectedLessonId={selectedLessonId}
                 onStartLesson={startLesson}

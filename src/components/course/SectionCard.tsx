@@ -1,3 +1,4 @@
+import { containerProgressLabel } from '../../utils/learning-path'
 import { useNavigate } from 'react-router-dom'
 import type { UserCourseSectionResponse } from '../../types/course.types'
 
@@ -69,11 +70,7 @@ export default function SectionCard({ courseId, section }: SectionCardProps) {
       : 0
   const safeProgressPercent = Math.min(100, Math.max(0, progressPercent))
 
-  const statusLabel = section.isCompleted
-    ? 'Đã hoàn thành'
-    : section.progressStatus === 'IN_PROGRESS'
-      ? 'Đang học'
-      : 'Sẵn sàng học'
+  const statusLabel = containerProgressLabel(section)
 
   const actionLabel = section.isLocked
     ? 'Chưa mở khóa'
@@ -85,6 +82,8 @@ export default function SectionCard({ courseId, section }: SectionCardProps) {
 
   const message = section.isLocked
     ? 'Hoàn thành tất cả bài học trong phần trước để mở khóa nhé!'
+    : section.hasNewContent
+      ? statusLabel
     : section.isCompleted
       ? 'Tuyệt vời! Bạn đã hoàn thành phần học này.'
       : section.description?.trim() || `Cùng khám phá “${section.name}” nhé!`

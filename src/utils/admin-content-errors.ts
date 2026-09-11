@@ -11,6 +11,7 @@ const messages: Record<string, string> = {
   QUESTION_TOPIC_MISMATCH: 'Câu hỏi liên kết với Topic khác nên không thể gán vào Lesson này.',
   QUESTION_ALREADY_ASSIGNED_TO_LESSON: 'Một hoặc nhiều câu hỏi đã thuộc Lesson này.',
   LESSON_NOT_READY_TO_PUBLISH: 'Lesson chưa đủ điều kiện xuất bản. Hãy kiểm tra tên, điểm yêu cầu và số câu hỏi.',
+  LESSON_REQUIRES_PUBLISHED_QUESTION: 'Không thể gỡ câu hỏi đã xuất bản cuối cùng. Hãy thêm hoặc phát hành câu hỏi khác trước.',
   INVALID_LESSON_ORDER: 'Thứ tự Lesson không hợp lệ. Danh sách đã được khôi phục.',
   VALIDATION_ERROR: 'Dữ liệu chưa hợp lệ. Vui lòng kiểm tra lại biểu mẫu.',
   INTERNAL_SERVER_ERROR: 'Máy chủ đang gặp sự cố. Vui lòng thử lại sau.',
