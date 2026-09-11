@@ -194,6 +194,7 @@ export default function StartLessonPage() {
             nextHeartAt: result.nextHeartAt,
             totalXp: result.rewards.totalXp,
             level: result.rewards.level,
+            diamond: result.rewards.totalDiamond,
             currentStreak: result.rewards.currentStreak,
             longestStreak: result.rewards.longestStreak,
           },

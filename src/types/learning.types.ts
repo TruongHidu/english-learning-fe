@@ -66,6 +66,7 @@ export interface LessonCompletionRewards {
   xpEarned: number
   diamondEarned: number
   totalXp: number
+  totalDiamond: number
   level: number
   currentStreak: number
   longestStreak: number
