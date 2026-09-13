@@ -48,6 +48,7 @@ export interface QuestionResponse {
   content: string
   instruction: string | null
   correctAnswer: unknown | null
+  acceptedAnswers?: string[]
   options: QuestionOption[] | null
   matchingPairs: MatchingPair[] | null
   explanation: string | null
@@ -82,6 +83,7 @@ export interface CreateQuestionInput {
   content: string
   instruction?: string
   correctAnswer?: unknown
+  acceptedAnswers?: string[]
   options?: QuestionOption[]
   matchingPairs?: MatchingPair[]
   explanation?: string
@@ -97,6 +99,7 @@ export interface UpdateQuestionInput {
   content?: string
   instruction?: string
   correctAnswer?: unknown
+  acceptedAnswers?: string[]
   options?: QuestionOption[]
   matchingPairs?: MatchingPair[]
   explanation?: string
@@ -114,6 +117,7 @@ export interface QuestionFormSubmission {
 }
 
 export interface QuestionMediaFieldErrors {
+  acceptedAnswers?: string
   image?: string
   audio?: string
 }

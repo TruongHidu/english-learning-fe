@@ -5,6 +5,7 @@ interface CheckFooterProps {
   isDisabled?: boolean
   correctAnswer?: string | null
   explanation?: string | null
+  gradingStatus?: 'NORMAL' | 'AI_UNAVAILABLE_FALLBACK'
   onCheck: () => void
   onContinue: () => void
 }
@@ -14,6 +15,7 @@ export default function CheckFooter({
   isDisabled = false,
   correctAnswer,
   explanation,
+  gradingStatus,
   onCheck,
   onContinue,
 }: CheckFooterProps) {
@@ -59,6 +61,11 @@ export default function CheckFooter({
                 </div>
                 <h3 className="text-xl font-black md:text-2xl">Sai rồi</h3>
               </div>
+              {gradingStatus === 'AI_UNAVAILABLE_FALLBACK' && (
+                <p role="status" className="mt-2 text-sm">
+                  Câu trả lời chưa khớp đáp án được chấp nhận. AI chấm dịch đang tạm gián đoạn nên bạn không bị trừ tim.
+                </p>
+              )}
               {correctAnswer && (
                 <div className="mt-1 text-base md:text-lg pl-[52px]">
                   <span className="font-semibold opacity-90">Đáp án đúng là:</span>{' '}

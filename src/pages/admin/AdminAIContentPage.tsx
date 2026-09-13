@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from 'react'
+import { ApiError } from '../../api/api-error'
 import { adminAiService } from '../../services/admin-ai.service'
 import { adminCourseService } from '../../services/admin-course.service'
 import { adminSectionService } from '../../services/admin-section.service'
@@ -1010,6 +1011,11 @@ export default function AdminAIContentPage() {
       void loadDraftsForTopic(selectedTopicId)
     } catch (err: unknown) {
       setQuestionFormServerError(getAdminContentError(err, 'Không thể lưu câu hỏi.'))
+      if (err instanceof ApiError) {
+        setQuestionFormServerMediaErrors({
+          acceptedAnswers: err.fieldErrors.find((item) => /^acceptedAnswers(?:\.|$)/.test(item.field))?.message,
+        })
+      }
     } finally {
       setIsQuestionFormSubmitting(false)
     }

@@ -402,6 +402,7 @@ export default function StartLessonPage() {
             }
             correctAnswer={typeof checkResult?.correctAnswer === 'string' ? checkResult.correctAnswer : Array.isArray(checkResult?.correctAnswer) ? checkResult.correctAnswer.join(', ') : undefined}
             explanation={checkResult?.explanation}
+            gradingStatus={checkResult?.gradingStatus}
             onCheck={() => void handleCheck()}
             onContinue={handleContinue}
           />

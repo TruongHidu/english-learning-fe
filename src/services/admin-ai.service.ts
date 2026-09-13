@@ -1,4 +1,5 @@
 import api from '../api/axios'
+import { cleanAcceptedAnswers } from '../utils/accepted-answers'
 import type {
   CommitVocabularyApiResponse,
   CommitVocabularyRequest,
@@ -95,7 +96,9 @@ export const adminAiService = {
     const config = options?.signal ? { signal: options.signal } : {}
     const response = await api.post<CommitQuestionApiResponse>(
       `/admin/ai/generations/${generationId}/questions/commit`,
-      payload,
+      { ...payload, items: payload.items.map((item) => item.type === 'TRANSLATION'
+        ? { ...item, acceptedAnswers: cleanAcceptedAnswers(item.acceptedAnswers ?? []) }
+        : item) },
       config,
     )
     return response.data.data

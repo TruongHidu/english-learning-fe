@@ -108,6 +108,7 @@ export default function AdminTopicDetailPage() {
       setQuestionMediaErrors({
         image: uploadErrors.image,
         audio: uploadErrors.audio,
+        acceptedAnswers: uploadErrors.acceptedAnswers,
       })
     } finally {
       setIsSubmitting(false)

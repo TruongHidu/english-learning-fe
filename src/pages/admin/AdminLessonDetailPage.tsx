@@ -253,6 +253,7 @@ export default function AdminLessonDetailPage() {
       setCreateQuestionMediaErrors({
         image: uploadErrors.image,
         audio: uploadErrors.audio,
+        acceptedAnswers: uploadErrors.acceptedAnswers,
       })
     } finally {
       setIsSubmitting(false)

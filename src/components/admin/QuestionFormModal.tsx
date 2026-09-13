@@ -1,4 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
+import AcceptedAnswersField from './AcceptedAnswersField'
+import { acceptedAnswersError, cleanAcceptedAnswers } from '../../utils/accepted-answers'
 import type {
   CreateQuestionInput,
   QuestionFormSubmission,
@@ -49,6 +51,7 @@ export default function QuestionFormModal({
   const [explanation, setExplanation] = useState('')
   const [difficulty, setDifficulty] = useState<VocabularyDifficulty>('EASY')
   const [correctAnswerText, setCorrectAnswerText] = useState('')
+  const [acceptedAnswers, setAcceptedAnswers] = useState<string[]>([])
   const [selectedVocabIds, setSelectedVocabIds] = useState<string[]>([])
   const [imageFile, setImageFile] = useState<File | null>(null)
   const [audioFile, setAudioFile] = useState<File | null>(null)
@@ -89,6 +92,7 @@ export default function QuestionFormModal({
       return
     }
     setLocalError(null)
+    setAcceptedAnswers(question?.acceptedAnswers ?? [])
     setImageFile(null)
     setAudioFile(null)
     setRemoveImage(false)
@@ -304,6 +308,10 @@ export default function QuestionFormModal({
       instruction: instruction.trim() || undefined,
       explanation: explanation.trim() || undefined,
       difficulty,
+    }
+    if (type === 'TRANSLATION') {
+      if (acceptedAnswersError(acceptedAnswers)) return
+      payload.acceptedAnswers = cleanAcceptedAnswers(acceptedAnswers)
     }
 
     // Khi edit từ Ngân hàng câu hỏi, form không có danh sách từ vựng để chỉnh.
@@ -803,6 +811,10 @@ export default function QuestionFormModal({
                 />
               </div>
 
+              {type === 'TRANSLATION' && (
+                <AcceptedAnswersField value={acceptedAnswers} onChange={setAcceptedAnswers}
+                  disabled={isLoading} error={serverMediaErrors?.acceptedAnswers} />
+              )}
               {type === 'ORDER_SENTENCE' && correctAnswerText.trim() ? (
                 <div className="p-4 bg-emerald-50/70 border border-emerald-200 rounded-xl space-y-2">
                   <label className="block text-xs font-extrabold text-emerald-900">

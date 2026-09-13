@@ -177,6 +177,7 @@ export default function AdminQuestionListPage() {
       setServerMediaErrors({
         image: uploadErrors.image,
         audio: uploadErrors.audio,
+        acceptedAnswers: uploadErrors.acceptedAnswers,
       })
     } finally {
       setIsSubmitting(false)

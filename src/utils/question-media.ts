@@ -121,6 +121,7 @@ export function getQuestionUploadErrors(
   return {
     image: imageError,
     audio: audioError,
+    acceptedAnswers: error.fieldErrors.find((item) => /^acceptedAnswers(?:\.|$)/.test(item.field))?.message,
     general:
       uploadMessages[error.code] ??
       firstGeneralFieldError ??

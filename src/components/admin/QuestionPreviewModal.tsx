@@ -145,6 +145,10 @@ export default function QuestionPreviewModal({
       const targetSentence = String(question.correctAnswer ?? '').trim()
       const isMatch = removeVietnameseAccents(userSentence) === removeVietnameseAccents(targetSentence)
       setIsCorrect(isMatch)
+    } else if (question.type === 'TRANSLATION') {
+      const normalize = (value: string) => value.trim().toLowerCase().replace(/\s+/g, ' ')
+      setIsCorrect([String(question.correctAnswer ?? ''), ...(question.acceptedAnswers ?? [])]
+        .some((answer) => Boolean(normalize(answer)) && normalize(answer) === normalize(textAnswer)))
     } else {
       const targetStr = String(question.correctAnswer ?? '').trim()
       const userStr = textAnswer.trim()
