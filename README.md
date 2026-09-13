@@ -90,3 +90,25 @@ npm run test
 npm run lint
 npm run build
 ```
+# Authentication sessions
+
+The browser keeps access JWTs in memory only. On page reload, AuthProvider calls
+`POST /auth/refresh` with the HttpOnly cookie, then loads `/users/me` before finishing
+initialization. Login/refresh responses never expose the refresh token to JavaScript.
+
+Axios sends credentials and retries a protected request at most once after a 401.
+Concurrent failures share a refresh promise; delayed failures use the latest token.
+Auth endpoints and 403 responses are excluded. Refresh failure clears authentication
+and triggers the existing login redirect. SSE reconnects when the access token changes.
+Web Locks serialize cookie rotations between tabs where supported (secure contexts);
+without Web Locks simultaneous refreshes across tabs can trigger reuse protection
+and require a new login. In-memory single-flight protection works in every tab.
+
+Set `VITE_API_BASE_URL` to the backend `/api/v1` URL. Set the backend `FRONTEND_URL`
+to the exact frontend origin and configure its cookie SameSite/Secure settings as
+described in the backend README. Use HTTPS in production. Cross-site cookie blocking
+may require hosting frontend and backend under the same site.
+
+Logout clears local state even if the server is unavailable. If that network call
+fails, the server cookie/session may still exist and reload can restore it. A
+successful backend logout revokes the session family and clears its cookie.
