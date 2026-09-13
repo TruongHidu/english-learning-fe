@@ -6,10 +6,12 @@ import type {
   RegisterResponse,
 } from '../types/auth.types'
 import { authStorage } from '../utils/auth-storage'
+import { authApi, finishPendingRefresh, withAuthCookieLock } from '../api/refresh'
 
 export const authService = {
   async login(input: LoginRequest): Promise<LoginResponse> {
-    const response = await api.post<LoginResponse>('/auth/login', input)
+    await finishPendingRefresh()
+    const response = await withAuthCookieLock(() => authApi.post<LoginResponse>('/auth/login', input))
     return response.data
   },
 
@@ -18,7 +20,9 @@ export const authService = {
     return response.data
   },
 
-  logout(): void {
+  async logout(): Promise<void> {
     authStorage.clear()
+    await finishPendingRefresh()
+    try { await withAuthCookieLock(() => authApi.post('/auth/logout')) } catch { /* Local logout must always complete. */ }
   },
 }

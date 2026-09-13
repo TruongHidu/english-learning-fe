@@ -3,10 +3,11 @@ import type { ReactNode } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { authService } from '../services/auth.service'
 import { userService } from '../services/user.service'
+import { refreshAccessToken } from '../api/refresh'
 import type { AuthSession, AuthUser, LoginRequest } from '../types/auth.types'
 import {
   AUTH_INVALIDATED_EVENT,
-  AUTH_STORAGE_KEY,
+  AUTH_TOKEN_CHANGED_EVENT,
   authStorage,
 } from '../utils/auth-storage'
 import { AuthContext } from './auth-context'
@@ -23,19 +24,22 @@ export function AuthProvider({ children }: AuthProviderProps) {
   const [user, setUser] = useState<AuthUser | null>(null)
   const [isInitializing, setIsInitializing] = useState(true)
 
-  const restoreSession = useCallback(() => {
-    const session = authStorage.getSession()
-    setAccessToken(session?.accessToken ?? null)
-    setUser(session?.user ?? null)
-    setIsInitializing(false)
-  }, [])
-
   useEffect(() => {
-    restoreSession()
+    let active = true
+    const generation = authStorage.getGeneration()
+    void refreshAccessToken().then(() => userService.getProfile()).then((profile) => {
+      if (!active || generation !== authStorage.getGeneration()) return
+      const token = authStorage.getAccessToken()
+      if (token) {
+        authStorage.saveSession({ accessToken: token, user: profile })
+        setAccessToken(token)
+        setUser(profile)
+      }
+    }).catch(() => {
+      if (active && generation === authStorage.getGeneration()) authStorage.clear()
+    }).finally(() => { if (active) setIsInitializing(false) })
 
-    function handleStorage(event: StorageEvent) {
-      if (event.key === AUTH_STORAGE_KEY) restoreSession()
-    }
+    function handleTokenChanged() { setAccessToken(authStorage.getAccessToken()) }
 
     function handleInvalidatedAuth() {
       setAccessToken(null)
@@ -43,14 +47,15 @@ export function AuthProvider({ children }: AuthProviderProps) {
       setIsInitializing(false)
     }
 
-    window.addEventListener('storage', handleStorage)
+    window.addEventListener(AUTH_TOKEN_CHANGED_EVENT, handleTokenChanged)
     window.addEventListener(AUTH_INVALIDATED_EVENT, handleInvalidatedAuth)
 
     return () => {
-      window.removeEventListener('storage', handleStorage)
+      active = false
+      window.removeEventListener(AUTH_TOKEN_CHANGED_EVENT, handleTokenChanged)
       window.removeEventListener(AUTH_INVALIDATED_EVENT, handleInvalidatedAuth)
     }
-  }, [restoreSession])
+  }, [])
 
   const updateCachedUser = useCallback((patch: AuthUserCachePatch) => {
     setUser((currentUser) => {
@@ -175,7 +180,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
   }, [])
 
   const logout = useCallback(() => {
-    authService.logout()
+    void authService.logout()
     setAccessToken(null)
     setUser(null)
     navigate('/login', { replace: true })
@@ -183,7 +188,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
 
   useEffect(() => {
     if (!accessToken || !user) return
-    authStorage.saveSession({ accessToken, user })
+    if (authStorage.getAccessToken() === accessToken) authStorage.saveSession({ accessToken, user })
   }, [accessToken, user])
 
   const value = useMemo(
