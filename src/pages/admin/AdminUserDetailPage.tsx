@@ -515,7 +515,7 @@ export default function AdminUserDetailPage() {
           </div>
 
           <DataTable
-            headers={['Từ vựng', 'Phiên âm', 'Nghĩa', 'Từ loại / Độ khó', 'Cấp độ SRS', 'Ngày học']}
+            headers={['Từ vựng', 'Nghĩa / Phân loại', 'Trạng thái', 'Độ thành thạo', 'Kết quả ôn', 'Lịch ôn']}
             caption="Từ vựng người dùng đã học"
           >
             {loadingVocab ? (
@@ -534,28 +534,67 @@ export default function AdminUserDetailPage() {
               vocabData.vocabularies.map((w) => (
                 <tr key={w.id}>
                   <td className="admin-table__primary">
-                    <span className="font-extrabold text-slate-800 text-sm">{w.word}</span>
+                    <div className="flex items-center gap-1.5">
+                      <span className="font-extrabold text-slate-800 text-sm">{w.word}</span>
+                      {w.isBookmarked ? <span title="Đã đánh dấu">🔖</span> : null}
+                    </div>
+                    <span className="text-slate-500 font-mono text-xs">
+                      {w.phonetic ? `/${w.phonetic}/` : '—'}
+                    </span>
                   </td>
-                  <td className="text-slate-500 font-mono text-xs">
-                    {w.phonetic ? `/${w.phonetic}/` : '—'}
-                  </td>
-                  <td className="font-semibold text-slate-700">{w.meaning}</td>
                   <td>
+                    <div className="font-semibold text-slate-700">{w.meaning}</div>
                     <span className="text-xs text-slate-500 font-medium">
                       {w.partOfSpeech || '—'} • {w.difficulty || '—'}
                     </span>
                   </td>
                   <td>
+                    <span
+                      className={`inline-flex rounded-full border px-2 py-0.5 text-[10px] font-extrabold ${
+                        w.status === 'MASTERED'
+                          ? 'border-emerald-200 bg-emerald-50 text-emerald-700'
+                          : 'border-blue-200 bg-blue-50 text-blue-700'
+                      }`}
+                    >
+                      {w.status === 'MASTERED' ? 'ĐÃ THÀNH THẠO' : 'ĐANG HỌC'}
+                    </span>
+                    {w.excludedFromReview ? (
+                      <div className="mt-1 text-[10px] font-semibold text-slate-400">Đã loại khỏi hàng đợi</div>
+                    ) : null}
+                  </td>
+                  <td>
                     <div className="flex flex-col gap-0.5">
                       <span className="text-xs font-extrabold text-amber-700 bg-amber-50 px-2 py-0.5 rounded-md border border-amber-200 inline-block w-fit">
-                        ⭐ Cấp {w.reviewLevel}
+                        {w.reviewLevel}/5
                       </span>
+                      <div className="h-1.5 w-20 overflow-hidden rounded-full bg-slate-100">
+                        <div
+                          className="h-full rounded-full bg-amber-500"
+                          style={{ width: `${Math.min(100, Math.max(0, w.reviewLevel * 20))}%` }}
+                        />
+                      </div>
+                    </div>
+                  </td>
+                  <td>
+                    <div className="flex flex-col gap-0.5">
                       <span className="text-[10px] text-slate-400 font-semibold">
                         Đúng: {w.correctCount} | Sai: {w.incorrectCount}
                       </span>
+                      <span className="text-[10px] text-slate-400 font-semibold">
+                        Chuỗi đúng: {w.correctStreak} | Tái sai: {w.lapseCount}
+                      </span>
+                      {w.averageResponseTimeMs > 0 ? (
+                        <span className="text-[10px] text-slate-400">
+                          Phản hồi TB: {(w.averageResponseTimeMs / 1000).toFixed(1)} giây
+                        </span>
+                      ) : null}
                     </div>
                   </td>
-                  <td className="text-xs text-slate-600">{formatDate(w.learnedAt)}</td>
+                  <td className="text-[10px] text-slate-600">
+                    <div>Học: {formatDate(w.learnedAt)}</div>
+                    <div>Ôn gần nhất: {formatDate(w.lastReviewedAt)}</div>
+                    <div>Ôn tiếp: {formatDate(w.nextReviewAt)}</div>
+                  </td>
                 </tr>
               ))
             )}

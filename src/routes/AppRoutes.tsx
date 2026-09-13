@@ -34,6 +34,7 @@ import ProfilePage from '../pages/profile/ProfilePage'
 import PaymentHistoryPage from '../pages/payment/PaymentHistoryPage'
 import PaymentResultPage from '../pages/payment/PaymentResultPage'
 import LearnedVocabularyPage from '../pages/vocabulary/LearnedVocabularyPage'
+import VocabularyReviewPage from '../pages/vocabulary/VocabularyReviewPage'
 
 function DashboardRedirect() {
   const { user } = useAuth()
@@ -70,6 +71,7 @@ function AppRoutes() {
           <Route path="/vocabulary" element={<LearnedVocabularyPage />} />
           {/* The learned-vocabulary navigation uses the Section → Topic vocabulary view. */}
           <Route path="/vocabularies/learned" element={<LearnedVocabularyPage learnedOnly />} />
+          <Route path="/vocabularies/review" element={<VocabularyReviewPage />} />
           <Route path="/learn/courses/:courseId" element={<CourseSectionsPage />} />
           <Route path="/learn/courses/:courseId/sections/:sectionId" element={<SectionTopicsPage />} />
           <Route path="/learn/topics/:topicId" element={<TopicLearningPathPage />} />

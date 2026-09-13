@@ -2,18 +2,17 @@ import { useEffect, useState, useMemo } from 'react'
 import { userService } from '../../services/user.service'
 import type { SectionVocabularyGroup, SectionVocabularyItem } from '../../types/user.types'
 import { useReviewStats } from '../../hooks/useVocabularyReview'
-import FlashcardReviewModal from '../../components/vocabulary/FlashcardReviewModal'
+import { useNavigate } from 'react-router-dom'
 
 export default function LearnedVocabularyPage({ learnedOnly = false }: { learnedOnly?: boolean }) {
+  const navigate = useNavigate()
   const [sections, setSections] = useState<SectionVocabularyGroup[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [searchQuery, setSearchQuery] = useState('')
   const [statusFilter, setStatusFilter] = useState<'ALL' | 'LEARNED' | 'UNLEARNED'>(learnedOnly ? 'LEARNED' : 'ALL')
   const [playingWord, setPlayingWord] = useState<string | null>(null)
   const [expandedSectionIds, setExpandedSectionIds] = useState<Record<string, boolean>>({})
-  const { stats, refetch: refetchReviewStats } = useReviewStats()
-  const [isReviewMode, setIsReviewMode] = useState(false)
-  const [isForceAll, setIsForceAll] = useState(false)
+  const { stats } = useReviewStats()
 
   useEffect(() => {
     async function fetchData() {
@@ -133,14 +132,11 @@ export default function LearnedVocabularyPage({ learnedOnly = false }: { learned
           <div className="flex flex-wrap items-center gap-3 self-start md:self-auto">
             <button
               type="button"
-              onClick={() => {
-                setIsForceAll(stats.dueToday === 0)
-                setIsReviewMode(true)
-              }}
+              onClick={() => navigate('/vocabularies/review')}
               disabled={totalCount === 0}
               className="rounded-2xl bg-white px-4 py-3 text-xs font-black uppercase tracking-wider text-emerald-700 shadow-md transition hover:bg-emerald-50 disabled:cursor-not-allowed disabled:opacity-50"
             >
-              🃏 Ôn bằng Flashcard
+              Ôn tập thông minh
               {stats.dueToday > 0 && <span className="ml-1">({stats.dueToday})</span>}
             </button>
             <div className="flex items-center gap-3 rounded-2xl bg-white/20 px-5 py-3 backdrop-blur-md">
@@ -329,16 +325,6 @@ export default function LearnedVocabularyPage({ learnedOnly = false }: { learned
         </div>
       )}
 
-      {isReviewMode && (
-        <FlashcardReviewModal
-          forceAll={isForceAll}
-          onClose={() => {
-            setIsReviewMode(false)
-            setIsForceAll(false)
-            void refetchReviewStats()
-          }}
-        />
-      )}
     </main>
   )
 }

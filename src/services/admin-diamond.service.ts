@@ -72,8 +72,16 @@ export interface AdminUserVocabularyItem {
   reviewCount: number
   correctCount: number
   incorrectCount: number
+  correctStreak: number
+  lapseCount: number
+  averageResponseTimeMs: number
+  lastQuestionType: string | null
+  lastAnswerQuality: string | null
+  isBookmarked: boolean
+  excludedFromReview: boolean
   learnedAt: string
   lastReviewedAt: string | null
+  nextReviewAt: string | null
 }
 
 export interface AdminUserVocabulariesData {
