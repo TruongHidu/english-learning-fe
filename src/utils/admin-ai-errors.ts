@@ -19,6 +19,8 @@ const aiVocabularyMessages: Record<string, string> = {
     'Một hoặc nhiều đề xuất chưa hợp lệ. Vui lòng kiểm tra lỗi tại từng dòng.',
   AI_PROVIDER_TIMEOUT:
     'AI phản hồi quá thời gian. Vui lòng thử lại sau.',
+  AI_PROVIDER_RATE_LIMITED:
+    'Dịch vụ AI đã đạt giới hạn sử dụng hoặc quota. Vui lòng thử lại sau hoặc kiểm tra hạn mức Gemini.',
   AI_PROVIDER_NOT_CONFIGURED:
     'AI chưa được cấu hình trên máy chủ. Vui lòng liên hệ quản trị hệ thống.',
   REQUEST_CANCELED: 'Yêu cầu đã được hủy.',

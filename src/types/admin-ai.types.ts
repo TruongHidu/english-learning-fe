@@ -105,6 +105,7 @@ export interface OrderSentenceQuestionCandidate extends QuestionCandidateBase {
 export interface TranslationQuestionCandidate extends QuestionCandidateBase {
   type: 'TRANSLATION'
   correctAnswer: string
+  acceptedAnswers?: string[]
 }
 
 export type GeneratedQuestionCandidate =

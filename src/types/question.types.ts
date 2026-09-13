@@ -41,6 +41,7 @@ export interface LinkedVocabularyItem {
 
 export interface QuestionResponse {
   id: string
+  topicId?: string | null
   vocabularyId: string | null
   vocabularyIds?: string[] | null
   vocabularies?: LinkedVocabularyItem[] | null
@@ -48,6 +49,7 @@ export interface QuestionResponse {
   content: string
   instruction: string | null
   correctAnswer: unknown | null
+  acceptedAnswers?: string[]
   options: QuestionOption[] | null
   matchingPairs: MatchingPair[] | null
   explanation: string | null
@@ -63,6 +65,7 @@ export interface QuestionResponse {
 
 export interface QuestionListItemResponse {
   id: string
+  topicId?: string | null
   vocabularyId: string | null
   vocabularyIds?: string[] | null
   vocabularies?: LinkedVocabularyItem[] | null
@@ -82,6 +85,7 @@ export interface CreateQuestionInput {
   content: string
   instruction?: string
   correctAnswer?: unknown
+  acceptedAnswers?: string[]
   options?: QuestionOption[]
   matchingPairs?: MatchingPair[]
   explanation?: string
@@ -97,12 +101,14 @@ export interface UpdateQuestionInput {
   content?: string
   instruction?: string
   correctAnswer?: unknown
+  acceptedAnswers?: string[]
   options?: QuestionOption[]
   matchingPairs?: MatchingPair[]
   explanation?: string
   difficulty?: VocabularyDifficulty
   audioUrl?: string | null
   imageUrl?: string | null
+  status?: QuestionStatus
 }
 
 export interface QuestionFormSubmission {
@@ -114,16 +120,21 @@ export interface QuestionFormSubmission {
 }
 
 export interface QuestionMediaFieldErrors {
+  acceptedAnswers?: string
   image?: string
   audio?: string
 }
 
 
+export type QuestionScope = 'ALL' | 'TOPIC_ONLY' | 'UNASSIGNED_ONLY'
+
 export interface QuestionListQuery {
   page?: number
   limit?: number
   search?: string
+  scope?: QuestionScope
   topicId?: string
+  includeUnassigned?: boolean
   vocabularyId?: string
   type?: QuestionType
   difficulty?: VocabularyDifficulty

@@ -1,3 +1,5 @@
+import AcceptedAnswersField from './AcceptedAnswersField'
+import { acceptedAnswersError } from '../../utils/accepted-answers'
 import type {
   AiGenerationStatus,
   GeneratedMatchingPair,
@@ -46,6 +48,10 @@ function validateCandidate(
   availableVocabularyIds: Set<string>,
 ): string[] {
   const errors: string[] = []
+  if (candidate.type === 'TRANSLATION') {
+    const error = acceptedAnswersError(candidate.acceptedAnswers ?? [])
+    if (error) errors.push(error)
+  }
   if (!candidate.content.trim()) errors.push('Nội dung câu hỏi là bắt buộc.')
   else if (candidate.content.trim().length > 1000) errors.push('Nội dung tối đa 1000 ký tự.')
   if ((candidate.instruction?.trim().length ?? 0) > 300) errors.push('Hướng dẫn tối đa 300 ký tự.')
@@ -299,6 +305,7 @@ export default function AiQuestionPreview({
                 <OrderSentenceEditor candidate={candidate} disabled={disabled} onChange={updateCandidate} />
               )}
               {candidate.type === 'TRANSLATION' && (
+                <>
                 <CandidateTextField
                   label="Bản dịch tiếng Việt đúng *"
                   value={candidate.correctAnswer}
@@ -306,6 +313,9 @@ export default function AiQuestionPreview({
                   multiline
                   onChange={(correctAnswer) => updateCandidate({ ...candidate, correctAnswer })}
                 />
+                <AcceptedAnswersField value={candidate.acceptedAnswers ?? []} disabled={disabled}
+                  onChange={(acceptedAnswers) => updateCandidate({ ...candidate, acceptedAnswers })} />
+                </>
               )}
 
               {errors.length > 0 && (

@@ -76,6 +76,8 @@ export interface LessonCompletionRewards {
 
 export interface SubmitAnswerResult {
   isCorrect: boolean
+  gradingStatus: 'NORMAL' | 'AI_UNAVAILABLE_FALLBACK'
+  heartDeducted: boolean
   correctAnswer?: unknown
   explanation?: string | null
   heartsRemaining: number
