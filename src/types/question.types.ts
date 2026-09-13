@@ -41,6 +41,7 @@ export interface LinkedVocabularyItem {
 
 export interface QuestionResponse {
   id: string
+  topicId?: string | null
   vocabularyId: string | null
   vocabularyIds?: string[] | null
   vocabularies?: LinkedVocabularyItem[] | null
@@ -64,6 +65,7 @@ export interface QuestionResponse {
 
 export interface QuestionListItemResponse {
   id: string
+  topicId?: string | null
   vocabularyId: string | null
   vocabularyIds?: string[] | null
   vocabularies?: LinkedVocabularyItem[] | null
@@ -106,6 +108,7 @@ export interface UpdateQuestionInput {
   difficulty?: VocabularyDifficulty
   audioUrl?: string | null
   imageUrl?: string | null
+  status?: QuestionStatus
 }
 
 export interface QuestionFormSubmission {
@@ -123,11 +126,15 @@ export interface QuestionMediaFieldErrors {
 }
 
 
+export type QuestionScope = 'ALL' | 'TOPIC_ONLY' | 'UNASSIGNED_ONLY'
+
 export interface QuestionListQuery {
   page?: number
   limit?: number
   search?: string
+  scope?: QuestionScope
   topicId?: string
+  includeUnassigned?: boolean
   vocabularyId?: string
   type?: QuestionType
   difficulty?: VocabularyDifficulty

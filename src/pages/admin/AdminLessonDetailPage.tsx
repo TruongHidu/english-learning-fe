@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import ConfirmModal from '../../components/admin/ConfirmModal'
 import DataTable from '../../components/admin/DataTable'
@@ -21,6 +21,8 @@ import type {
   QuestionResponse,
   QuestionListItemResponse,
   QuestionMediaFieldErrors,
+  QuestionListQuery,
+  QuestionScope,
   QuestionType,
 } from '../../types/question.types'
 import type { VocabularyDifficulty, VocabularyResponse } from '../../types/vocabulary.types'
@@ -29,12 +31,13 @@ import {
   getDuplicateNameError,
 } from '../../utils/admin-content-errors'
 
-import { vietnameseIncludes } from '../../utils/vietnamese'
 import QuestionPreviewModal from '../../components/admin/QuestionPreviewModal'
 import {
   buildQuestionFormData,
   getQuestionUploadErrors,
 } from '../../utils/question-media'
+
+const ASSIGN_PAGE_LIMIT = 15
 
 export default function AdminLessonDetailPage() {
   const { lessonId } = useParams<{ lessonId: string }>()
@@ -55,6 +58,7 @@ export default function AdminLessonDetailPage() {
   const [pendingStatus, setPendingStatus] = useState<ContentStatus | null>(null)
   const [deleteOpen, setDeleteOpen] = useState(false)
   const [isMutating, setIsMutating] = useState(false)
+  const [isReordering, setIsReordering] = useState(false)
 
   const [previewQuestion, setPreviewQuestion] = useState<QuestionResponse | null>(null)
   const [isPreviewOpen, setIsPreviewOpen] = useState(false)
@@ -70,20 +74,32 @@ export default function AdminLessonDetailPage() {
     number | null
   >(null)
 
+  const [editingQuestion, setEditingQuestion] = useState<QuestionResponse | null>(null)
+  const [isEditQuestionModalOpen, setIsEditQuestionModalOpen] = useState(false)
+  const [editQuestionError, setEditQuestionError] = useState<string | null>(null)
+  const [editQuestionMediaErrors, setEditQuestionMediaErrors] = useState<QuestionMediaFieldErrors>({})
+  const [loadingEditQuestionId, setLoadingEditQuestionId] = useState<string | null>(null)
 
   const [isAssignModalOpen, setIsAssignModalOpen] = useState(false)
-
   const [availableQuestions, setAvailableQuestions] = useState<
     QuestionListItemResponse[]
   >([])
   const [selectedQuestionIds, setSelectedQuestionIds] = useState<string[]>([])
   const [assignSearch, setAssignSearch] = useState('')
+  const [debouncedAssignSearch, setDebouncedAssignSearch] = useState('')
   const [assignTypeFilter, setAssignTypeFilter] = useState<QuestionType | ''>(
     '',
   )
   const [assignDifficultyFilter, setAssignDifficultyFilter] = useState<
     VocabularyDifficulty | ''
   >('')
+  const [assignScopeFilter, setAssignScopeFilter] = useState<QuestionScope>('ALL')
+  const [assignPage, setAssignPage] = useState(1)
+  const [assignTotal, setAssignTotal] = useState(0)
+  const [assignTotalPages, setAssignTotalPages] = useState(1)
+  const [isFetchingQuestions, setIsFetchingQuestions] = useState(false)
+  const assignRequestIdRef = useRef(0)
+
   const [questionToRemove, setQuestionToRemove] =
     useState<LessonQuestionResponse | null>(null)
 
@@ -128,20 +144,104 @@ export default function AdminLessonDetailPage() {
     void loadData()
   }, [loadData])
 
-  const filteredAvailableQuestions = useMemo(() => {
-    return availableQuestions.filter((q) => {
-      const matchSearch =
-        !assignSearch || vietnameseIncludes(q.content, assignSearch)
-      const matchType = !assignTypeFilter || q.type === assignTypeFilter
-      const matchDiff =
-        !assignDifficultyFilter || q.difficulty === assignDifficultyFilter
-      return matchSearch && matchType && matchDiff
-    })
+  const questionStats = useMemo(() => {
+    const total = lessonQuestions.length
+    const published = lessonQuestions.filter(
+      (lq) => lq.question?.status === 'PUBLISHED',
+    ).length
+    const draft = lessonQuestions.filter(
+      (lq) => lq.question?.status === 'DRAFT',
+    ).length
+    return { total, published, draft }
+  }, [lessonQuestions])
+
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedAssignSearch(assignSearch)
+      setAssignPage(1)
+    }, 350)
+    return () => clearTimeout(timer)
+  }, [assignSearch])
+
+  const fetchAvailableQuestions = useCallback(
+    async (
+      pageToFetch: number,
+      searchKeyword: string,
+      typeVal: QuestionType | '',
+      diffVal: VocabularyDifficulty | '',
+      scopeVal: QuestionScope,
+    ) => {
+      if (!lesson) return
+      const requestId = ++assignRequestIdRef.current
+      setIsFetchingQuestions(true)
+      try {
+        const queryParams: QuestionListQuery = {
+          page: pageToFetch,
+          limit: ASSIGN_PAGE_LIMIT,
+          search: searchKeyword.trim() || undefined,
+          type: typeVal || undefined,
+          difficulty: diffVal || undefined,
+          scope: scopeVal !== 'ALL' ? scopeVal : undefined,
+        }
+
+        const res = lesson.topicId
+          ? await adminQuestionService.getQuestionsByTopic(
+              lesson.topicId,
+              queryParams,
+            )
+          : await adminQuestionService.getQuestions(queryParams)
+
+        if (requestId === assignRequestIdRef.current) {
+          const assignedIds = new Set(
+            lessonQuestions.map((lq) =>
+              String(lq.questionId || lq.question?.id),
+            ),
+          )
+          const unassigned = res.questions.filter(
+            (q) => !assignedIds.has(String(q.id)),
+          )
+          setAvailableQuestions(unassigned)
+          setAssignTotal(res.total)
+          setAssignTotalPages(
+            res.totalPages || Math.ceil(res.total / ASSIGN_PAGE_LIMIT) || 1,
+          )
+        }
+      } catch (err: unknown) {
+        if (requestId === assignRequestIdRef.current) {
+          showNotification(
+            'error',
+            getAdminContentError(
+              err,
+              'Không thể lấy danh sách câu hỏi từ ngân hàng.',
+            ),
+          )
+        }
+      } finally {
+        if (requestId === assignRequestIdRef.current) {
+          setIsFetchingQuestions(false)
+        }
+      }
+    },
+    [lesson, lessonQuestions],
+  )
+
+  useEffect(() => {
+    if (!isAssignModalOpen) return
+    void fetchAvailableQuestions(
+      assignPage,
+      debouncedAssignSearch,
+      assignTypeFilter,
+      assignDifficultyFilter,
+      assignScopeFilter,
+    )
   }, [
-    availableQuestions,
-    assignSearch,
+    isAssignModalOpen,
+    assignPage,
+    debouncedAssignSearch,
     assignTypeFilter,
     assignDifficultyFilter,
+    assignScopeFilter,
+    fetchAvailableQuestions,
   ])
 
 
@@ -261,27 +361,116 @@ export default function AdminLessonDetailPage() {
     }
   }
 
-  const openAssignModal = async () => {
-    setIsMutating(true)
+  const handleMoveQuestion = async (index: number, direction: 'up' | 'down') => {
+    if (!lessonId || isMutating || isReordering) return
+    const targetIndex = direction === 'up' ? index - 1 : index + 1
+    if (targetIndex < 0 || targetIndex >= lessonQuestions.length) return
+
+    const previousQuestions = [...lessonQuestions]
+    const updatedQuestions = [...lessonQuestions]
+    const temp = updatedQuestions[index]
+    updatedQuestions[index] = updatedQuestions[targetIndex]
+    updatedQuestions[targetIndex] = temp
+
+    // Optimistic UI update
+    setLessonQuestions(updatedQuestions)
+    setIsReordering(true)
     try {
-      const res = await adminQuestionService.getQuestions({ limit: 100 })
-      const assignedIds = new Set(lessonQuestions.map((lq) => lq.questionId))
-      const unassigned = res.questions.filter((q) => !assignedIds.has(q.id))
-      setAvailableQuestions(unassigned)
-      setSelectedQuestionIds([])
-      setAssignSearch('')
-      setAssignTypeFilter('')
-      setAssignDifficultyFilter('')
-      setIsAssignModalOpen(true)
+      const questionIds = updatedQuestions.map((lq) => lq.questionId)
+      await adminQuestionService.reorderLessonQuestions(lessonId, questionIds)
+    } catch (err: unknown) {
+      setLessonQuestions(previousQuestions)
+      showNotification(
+        'error',
+        getAdminContentError(err, 'Không thể cập nhật thứ tự câu hỏi.'),
+      )
+    } finally {
+      setIsReordering(false)
+    }
+  }
+
+  const handleOpenEditQuestion = async (lq: LessonQuestionResponse) => {
+    const targetQId = lq.questionId || lq.question?.id
+    setLoadingEditQuestionId(targetQId)
+    try {
+      const fullQuestion = await adminQuestionService.getQuestionById(targetQId)
+      setEditingQuestion(fullQuestion)
+      setEditQuestionError(null)
+      setEditQuestionMediaErrors({})
+      setQuestionUploadProgress(null)
+      setIsEditQuestionModalOpen(true)
     } catch (err: unknown) {
       showNotification(
         'error',
-        getAdminContentError(err, 'Không thể lấy ngân hàng câu hỏi.'),
+        getAdminContentError(err, 'Không thể tải chi tiết câu hỏi để sửa.'),
       )
     } finally {
-      setIsMutating(false)
+      setLoadingEditQuestionId(null)
     }
+  }
 
+  const handleEditQuestionSubmit = async (values: QuestionFormSubmission) => {
+    if (!editingQuestion) return
+    setIsSubmitting(true)
+    setEditQuestionError(null)
+    setEditQuestionMediaErrors({})
+    setQuestionUploadProgress(0)
+    try {
+      const updated = await adminQuestionService.updateQuestion(
+        editingQuestion.id,
+        buildQuestionFormData(values),
+        setQuestionUploadProgress,
+      )
+
+      setLessonQuestions((prev) =>
+        prev.map((item) => {
+          if (
+            item.questionId === updated.id ||
+            item.question?.id === updated.id
+          ) {
+            return {
+              ...item,
+              question: updated,
+            }
+          }
+          return item
+        }),
+      )
+
+      showNotification('success', 'Đã cập nhật câu hỏi thành công.')
+      setIsEditQuestionModalOpen(false)
+      setEditingQuestion(null)
+    } catch (err: unknown) {
+      const uploadErrors = getQuestionUploadErrors(
+        err,
+        'Không thể cập nhật câu hỏi.',
+      )
+      setEditQuestionError(uploadErrors.general ?? null)
+      setEditQuestionMediaErrors({
+        image: uploadErrors.image,
+        audio: uploadErrors.audio,
+        acceptedAnswers: uploadErrors.acceptedAnswers,
+      })
+    } finally {
+      setIsSubmitting(false)
+      setQuestionUploadProgress(null)
+    }
+  }
+
+  const openAssignModal = () => {
+    setAssignSearch('')
+    setDebouncedAssignSearch('')
+    setAssignTypeFilter('')
+    setAssignDifficultyFilter('')
+    setAssignScopeFilter('ALL')
+    setAssignPage(1)
+    setSelectedQuestionIds([])
+    setIsAssignModalOpen(true)
+  }
+
+  const closeAssignModal = () => {
+    setIsAssignModalOpen(false)
+    setAssignScopeFilter('ALL')
   }
 
   const handleAssignQuestion = async () => {
@@ -302,7 +491,7 @@ export default function AdminLessonDetailPage() {
           ? `Đã gán ${assignResult.assignedCount} câu hỏi; bỏ qua ${assignResult.skippedCount} câu đã có.`
           : `Đã gán ${assignResult.assignedCount} câu hỏi vào bài học.`,
       )
-      setIsAssignModalOpen(false)
+      closeAssignModal()
     } catch (err: unknown) {
       showNotification(
         'error',
@@ -522,62 +711,137 @@ export default function AdminLessonDetailPage() {
             }
           />
         ) : (
-          <DataTable
-            headers={[
-              'Thứ tự',
-              'Nội dung câu hỏi',
-              'Loại câu hỏi',
-              'Độ khó',
-              'Thao tác',
-            ]}
-            caption="Danh sách câu hỏi bài học"
-          >
-            {lessonQuestions.map((lq, idx) => (
-              <tr key={lq.id}>
-                <td>
-                  <strong>#{idx + 1}</strong>
-                </td>
-                <td className="admin-table__primary">
-                  <strong>{lq.question.content}</strong>
-                </td>
-                <td>
-                  <span className="text-xs font-semibold px-2 py-1 bg-slate-100 rounded">
-                    {lq.question.type}
+          <>
+            {/* Publish Readiness Banner khi Lesson ở trạng thái DRAFT */}
+            {lesson.status === 'DRAFT' && (
+              <div className="mb-4 p-3.5 rounded-xl border border-amber-200 bg-amber-50/80 text-xs text-amber-900 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
+                <div className="flex items-center gap-2 flex-wrap">
+                  <span className="font-bold">Tổng số câu hỏi: {questionStats.total}</span>
+                  <span>•</span>
+                  <span className="text-emerald-700 font-semibold">
+                    Đã xuất bản (PUBLISHED): {questionStats.published}
                   </span>
-                </td>
-                <td>
-                  <span className="font-bold text-xs">
-                    {lq.question.difficulty === 'EASY'
-                      ? 'Dễ'
-                      : lq.question.difficulty === 'MEDIUM'
-                        ? 'Vừa'
-                        : 'Khó'}
+                  <span>•</span>
+                  <span className="text-amber-700 font-semibold">
+                    Bản nháp (DRAFT): {questionStats.draft}
                   </span>
-                </td>
-                <td>
-                  <div className="flex gap-2">
-                    <button
-                      type="button"
-                      className="admin-button admin-button--secondary admin-button--small"
-                      onClick={() => {
-                        setPreviewQuestion(lq.question)
-                        setIsPreviewOpen(true)
-                      }}
-                    >
-                      👀 Xem trước
-                    </button>
-                    <button
-                      type="button"
-                      className="admin-button admin-button--danger admin-button--small"
-                      onClick={() => setQuestionToRemove(lq)}
-                    >
-                      Gỡ câu hỏi
-                    </button>
+                </div>
+                {questionStats.published === 0 && (
+                  <div className="flex items-center gap-1.5 font-bold text-amber-800">
+                    <span>⚠️</span>
+                    <span>Bài học cần ít nhất 1 câu hỏi ĐÃ XUẤT BẢN để có thể chuyển sang trạng thái Đã xuất bản</span>
                   </div>
-                </td>
-              </tr>
-            ))}
-          </DataTable>
+                )}
+              </div>
+            )}
+
+            <DataTable
+              headers={[
+                'Thứ tự',
+                'Nội dung câu hỏi',
+                'Loại câu hỏi',
+                'Độ khó',
+                'Trạng thái',
+                'Thao tác',
+              ]}
+              caption="Danh sách câu hỏi bài học"
+            >
+              {lessonQuestions.map((lq, idx) => (
+                <tr key={lq.id}>
+                  <td style={{ whiteSpace: 'nowrap' }}>
+                    <div className="flex items-center gap-2">
+                      <strong>#{idx + 1}</strong>
+                      <div className="flex items-center gap-1">
+                        <button
+                          type="button"
+                          className="admin-button admin-button--secondary admin-button--small"
+                          style={{ padding: '2px 7px', minWidth: '26px', lineHeight: 1 }}
+                          disabled={idx === 0 || isMutating || isReordering}
+                          onClick={() => void handleMoveQuestion(idx, 'up')}
+                          title="Di chuyển lên"
+                          aria-label={`Di chuyển câu hỏi #${idx + 1} lên`}
+                        >
+                          ↑
+                        </button>
+                        <button
+                          type="button"
+                          className="admin-button admin-button--secondary admin-button--small"
+                          style={{ padding: '2px 7px', minWidth: '26px', lineHeight: 1 }}
+                          disabled={
+                            idx === lessonQuestions.length - 1 ||
+                            isMutating ||
+                            isReordering
+                          }
+                          onClick={() => void handleMoveQuestion(idx, 'down')}
+                          title="Di chuyển xuống"
+                          aria-label={`Di chuyển câu hỏi #${idx + 1} xuống`}
+                        >
+                          ↓
+                        </button>
+                      </div>
+                    </div>
+                  </td>
+                  <td className="admin-table__primary">
+                    <strong>{lq.question.content}</strong>
+                  </td>
+                  <td>
+                    <span className="text-xs font-semibold px-2 py-1 bg-slate-100 rounded">
+                      {lq.question.type}
+                    </span>
+                  </td>
+                  <td>
+                    <span className="font-bold text-xs">
+                      {lq.question.difficulty === 'EASY'
+                        ? 'Dễ'
+                        : lq.question.difficulty === 'MEDIUM'
+                          ? 'Vừa'
+                          : 'Khó'}
+                    </span>
+                  </td>
+                  <td>
+                    <StatusBadge status={lq.question.status} size="sm" />
+                  </td>
+                  <td>
+                    <div className="flex gap-2">
+                      <button
+                        type="button"
+                        className="admin-button admin-button--secondary admin-button--small"
+                        onClick={() => {
+                          setPreviewQuestion(lq.question)
+                          setIsPreviewOpen(true)
+                        }}
+                      >
+                        👀 Xem trước
+                      </button>
+                      <button
+                        type="button"
+                        className="admin-button admin-button--secondary admin-button--small"
+                        disabled={
+                          loadingEditQuestionId ===
+                            (lq.questionId || lq.question?.id) ||
+                          isSubmitting
+                        }
+                        onClick={() => void handleOpenEditQuestion(lq)}
+                      >
+                        {loadingEditQuestionId ===
+                        (lq.questionId || lq.question?.id)
+                          ? 'Đang tải...'
+                          : '✏️ Sửa'}
+                      </button>
+                      <button
+                        type="button"
+                        className="admin-button admin-button--danger admin-button--small"
+                        disabled={isMutating}
+                        onClick={() => setQuestionToRemove(lq)}
+                      >
+                        Gỡ câu hỏi
+                      </button>
+                    </div>
+                  </td>
+                </tr>
+              ))}
+            </DataTable>
+          </>
         )}
       </section>
 
@@ -607,28 +871,48 @@ export default function AdminLessonDetailPage() {
         }}
       />
 
+      {/* Modal Sửa Câu Hỏi Trực Tiếp Cho Lesson */}
+      <QuestionFormModal
+        isOpen={isEditQuestionModalOpen}
+        question={editingQuestion}
+        topicVocabularies={topicVocabularies}
+        isLoading={isSubmitting}
+        serverError={editQuestionError}
+        serverMediaErrors={editQuestionMediaErrors}
+        uploadProgress={questionUploadProgress}
+        onSubmit={handleEditQuestionSubmit}
+        onClose={() => {
+          if (!isSubmitting) {
+            setIsEditQuestionModalOpen(false)
+            setEditingQuestion(null)
+            setEditQuestionError(null)
+            setEditQuestionMediaErrors({})
+            setQuestionUploadProgress(null)
+          }
+        }}
+      />
 
-      {/* Modal Gán Câu Hỏi Nâng Cao với Search, Filter & Multi-Select */}
+      {/* Modal Gán Câu Hỏi Nâng Cao với Server-side Search, Filter & Multi-Select */}
       {isAssignModalOpen ? (
         <div
           className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs"
           role="dialog"
           aria-modal="true"
         >
-          <div className="w-full max-w-2xl bg-white rounded-2xl p-6 shadow-2xl border-2 border-slate-200 overflow-y-auto max-h-[90vh]">
+          <div className="w-full max-w-3xl bg-white rounded-2xl p-6 shadow-2xl border-2 border-slate-200 overflow-y-auto max-h-[90vh]">
             <div className="flex items-center justify-between pb-4 mb-4 border-b border-slate-100">
               <div>
                 <h2 className="text-xl font-extrabold text-slate-800">
                   Gán câu hỏi vào bài học
                 </h2>
                 <p className="text-xs text-slate-500">
-                  Tìm kiếm, lọc và chọn các câu hỏi từ Ngân hàng câu hỏi để gán vào bài học này.
+                  Tìm kiếm, lọc và chọn các câu hỏi thuộc chủ đề hoặc câu hỏi dùng chung từ Ngân hàng câu hỏi.
                 </p>
               </div>
               <button
                 type="button"
                 className="text-slate-500 p-2 font-bold text-lg"
-                onClick={() => setIsAssignModalOpen(false)}
+                onClick={closeAssignModal}
                 disabled={isSubmitting}
               >
                 ×
@@ -636,7 +920,7 @@ export default function AdminLessonDetailPage() {
             </div>
 
             {/* Filter Bar trong Modal */}
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3 mb-4">
               <input
                 className="admin-field"
                 placeholder="Tìm nội dung câu hỏi..."
@@ -645,10 +929,23 @@ export default function AdminLessonDetailPage() {
               />
               <select
                 className="admin-select"
+                value={assignScopeFilter}
+                onChange={(e) => {
+                  setAssignScopeFilter(e.target.value as QuestionScope)
+                  setAssignPage(1)
+                }}
+              >
+                <option value="ALL">Tất cả nguồn</option>
+                <option value="TOPIC_ONLY">🎯 Chỉ thuộc Topic</option>
+                <option value="UNASSIGNED_ONLY">🌐 Chỉ dùng chung</option>
+              </select>
+              <select
+                className="admin-select"
                 value={assignTypeFilter}
-                onChange={(e) =>
+                onChange={(e) => {
                   setAssignTypeFilter(e.target.value as QuestionType | '')
-                }
+                  setAssignPage(1)
+                }}
               >
                 <option value="">Tất cả loại câu hỏi</option>
                 <option value="MULTIPLE_CHOICE">Trắc nghiệm</option>
@@ -661,11 +958,12 @@ export default function AdminLessonDetailPage() {
               <select
                 className="admin-select"
                 value={assignDifficultyFilter}
-                onChange={(e) =>
+                onChange={(e) => {
                   setAssignDifficultyFilter(
                     e.target.value as VocabularyDifficulty | '',
                   )
-                }
+                  setAssignPage(1)
+                }}
               >
                 <option value="">Tất cả độ khó</option>
                 <option value="EASY">Dễ</option>
@@ -675,38 +973,42 @@ export default function AdminLessonDetailPage() {
             </div>
 
             {/* Danh sách câu hỏi có Checkbox */}
-            {filteredAvailableQuestions.length === 0 ? (
+            {isFetchingQuestions ? (
+              <div className="p-8 text-center bg-slate-50 rounded-xl border border-slate-200 my-2">
+                <p className="text-sm text-slate-500 font-semibold animate-pulse">
+                  Đang tải danh sách câu hỏi...
+                </p>
+              </div>
+            ) : availableQuestions.length === 0 ? (
               <div className="p-8 text-center bg-slate-50 rounded-xl border border-slate-200 my-2">
                 <p className="text-sm text-slate-500 font-semibold">
-                  {availableQuestions.length === 0
-                    ? 'Tất cả câu hỏi trong Ngân hàng đã được gán vào bài học này.'
-                    : 'Không tìm thấy câu hỏi chưa gán nào khớp với bộ lọc.'}
+                  {assignSearch || assignTypeFilter || assignDifficultyFilter
+                    ? 'Không tìm thấy câu hỏi chưa gán nào khớp với bộ lọc.'
+                    : 'Tất cả câu hỏi khả dụng (thuộc chủ đề hoặc dùng chung) đã được gán vào bài học này.'}
                 </p>
               </div>
             ) : (
-              <div className="border border-slate-200 rounded-xl overflow-hidden mb-4">
+              <div className="border border-slate-200 rounded-xl overflow-hidden mb-3">
                 <div className="bg-slate-100 px-4 py-2 flex items-center justify-between border-b border-slate-200 text-xs font-extrabold text-slate-700">
                   <label className="flex items-center gap-2 cursor-pointer">
                     <input
                       type="checkbox"
                       className="w-4 h-4 rounded text-emerald-600"
                       checked={
-                        filteredAvailableQuestions.length > 0 &&
-                        filteredAvailableQuestions.every((q) =>
+                        availableQuestions.length > 0 &&
+                        availableQuestions.every((q) =>
                           selectedQuestionIds.includes(q.id),
                         )
                       }
                       onChange={(e) => {
                         if (e.target.checked) {
-                          const idsToAdd = filteredAvailableQuestions.map(
-                            (q) => q.id,
-                          )
+                          const idsToAdd = availableQuestions.map((q) => q.id)
                           setSelectedQuestionIds((prev) => [
                             ...Array.from(new Set([...prev, ...idsToAdd])),
                           ])
                         } else {
                           const idsToRemove = new Set(
-                            filteredAvailableQuestions.map((q) => q.id),
+                            availableQuestions.map((q) => q.id),
                           )
                           setSelectedQuestionIds((prev) =>
                             prev.filter((id) => !idsToRemove.has(id)),
@@ -714,16 +1016,24 @@ export default function AdminLessonDetailPage() {
                         }
                       }}
                     />
-                    <span>Chọn tất cả ({filteredAvailableQuestions.length})</span>
+                    <span>Chọn tất cả trang này ({availableQuestions.length})</span>
                   </label>
                   <span className="text-emerald-700 font-bold">
                     Đã chọn {selectedQuestionIds.length} câu hỏi
                   </span>
                 </div>
 
-                <div className="max-h-60 overflow-y-auto divide-y divide-slate-100">
-                  {filteredAvailableQuestions.map((q) => {
+                <div className="max-h-72 overflow-y-auto divide-y divide-slate-100">
+                  {availableQuestions.map((q) => {
                     const isChecked = selectedQuestionIds.includes(q.id)
+                    const isTopicQuestion = Boolean(
+                      (q.topicId &&
+                        lesson?.topicId &&
+                        String(q.topicId) === String(lesson.topicId)) ||
+                        q.vocabularyId ||
+                        (q.vocabularyIds && q.vocabularyIds.length > 0) ||
+                        (q.vocabularies && q.vocabularies.length > 0),
+                    )
                     return (
                       <label
                         key={q.id}
@@ -746,10 +1056,21 @@ export default function AdminLessonDetailPage() {
                           }}
                         />
                         <div className="flex-1 min-w-0">
-                          <p className="text-sm font-bold text-slate-800 truncate">
-                            {q.content}
-                          </p>
-                          <div className="flex items-center gap-2 text-xs text-slate-500 mt-0.5">
+                          <div className="flex items-center justify-between gap-2">
+                            <p className="text-sm font-bold text-slate-800 truncate">
+                              {q.content}
+                            </p>
+                            {isTopicQuestion ? (
+                              <span className="shrink-0 inline-flex items-center gap-1 font-semibold px-2 py-0.5 rounded text-[11px] bg-blue-50 text-blue-700 border border-blue-200">
+                                🎯 Thuộc Topic
+                              </span>
+                            ) : (
+                              <span className="shrink-0 inline-flex items-center gap-1 font-semibold px-2 py-0.5 rounded text-[11px] bg-amber-50 text-amber-700 border border-amber-200">
+                                🌐 Dùng chung
+                              </span>
+                            )}
+                          </div>
+                          <div className="flex items-center gap-2 text-xs text-slate-500 mt-1">
                             <span className="font-semibold px-1.5 py-0.5 bg-slate-100 rounded">
                               {q.type}
                             </span>
@@ -761,6 +1082,8 @@ export default function AdminLessonDetailPage() {
                                   ? 'Vừa'
                                   : 'Khó'}
                             </span>
+                            <span>•</span>
+                            <StatusBadge status={q.status} size="sm" />
                           </div>
                         </div>
                       </label>
@@ -770,11 +1093,38 @@ export default function AdminLessonDetailPage() {
               </div>
             )}
 
+            {/* Pagination Controls */}
+            <div className="flex items-center justify-between py-2 px-1 text-xs text-slate-600 mb-2">
+              <span>
+                Trang <strong>{assignPage}</strong> / <strong>{assignTotalPages || 1}</strong> · Tổng <strong>{assignTotal}</strong> câu hỏi
+              </span>
+              {assignTotalPages > 1 && (
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    className="admin-button admin-button--secondary admin-button--small"
+                    disabled={assignPage <= 1 || isFetchingQuestions}
+                    onClick={() => setAssignPage((p) => Math.max(1, p - 1))}
+                  >
+                    ← Trước
+                  </button>
+                  <button
+                    type="button"
+                    className="admin-button admin-button--secondary admin-button--small"
+                    disabled={assignPage >= assignTotalPages || isFetchingQuestions}
+                    onClick={() => setAssignPage((p) => p + 1)}
+                  >
+                    Sau →
+                  </button>
+                </div>
+              )}
+            </div>
+
             <div className="flex justify-end gap-3 pt-3 border-t border-slate-100">
               <button
                 type="button"
                 className="admin-button admin-button--secondary"
-                onClick={() => setIsAssignModalOpen(false)}
+                onClick={closeAssignModal}
                 disabled={isSubmitting}
               >
                 Hủy

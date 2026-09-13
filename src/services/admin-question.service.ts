@@ -29,7 +29,7 @@ function getUploadConfig(onProgress?: QuestionUploadProgressHandler) {
 export const adminQuestionService = {
   async getQuestions(
     query?: QuestionListQuery,
-  ): Promise<{ questions: QuestionListItemResponse[]; total: number }> {
+  ): Promise<{ questions: QuestionListItemResponse[]; total: number; totalPages: number }> {
     const response = await api.get<GetAdminQuestionsResponse>(
       '/admin/questions',
       { params: query },
@@ -37,13 +37,14 @@ export const adminQuestionService = {
     return {
       questions: response.data.data.questions,
       total: response.data.data.pagination.total,
+      totalPages: response.data.data.pagination.totalPages,
     }
   },
 
   async getQuestionsByTopic(
     topicId: string,
     query?: QuestionListQuery,
-  ): Promise<{ questions: QuestionListItemResponse[]; total: number }> {
+  ): Promise<{ questions: QuestionListItemResponse[]; total: number; totalPages: number }> {
     const response = await api.get<GetAdminQuestionsResponse>(
       `/admin/topics/${topicId}/questions`,
       { params: query },
@@ -51,6 +52,7 @@ export const adminQuestionService = {
     return {
       questions: response.data.data.questions,
       total: response.data.data.pagination.total,
+      totalPages: response.data.data.pagination.totalPages,
     }
   },
 
