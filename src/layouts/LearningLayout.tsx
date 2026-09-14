@@ -1,40 +1,40 @@
-import RealtimeToast from '../components/common/RealtimeToast'
-import { NavLink, Outlet, useLocation } from 'react-router-dom'
-import DiamondMenu from '../components/navigation/DiamondMenu'
-import HeartMenu from '../components/navigation/HeartMenu'
-import MoreMenu from '../components/navigation/MoreMenu'
-import SidebarIcon from '../components/navigation/SidebarIcon'
-import type { SidebarIconName } from '../components/navigation/SidebarIcon'
-import { useAuth } from '../hooks/useAuth'
-import { getLevelInfo } from '../utils/level-calculator'
-import './LearningLayout.css'
+import RealtimeToast from "../components/common/RealtimeToast";
+import { NavLink, Outlet, useLocation } from "react-router-dom";
+import DiamondMenu from "../components/navigation/DiamondMenu";
+import HeartMenu from "../components/navigation/HeartMenu";
+import MoreMenu from "../components/navigation/MoreMenu";
+import SidebarIcon from "../components/navigation/SidebarIcon";
+import type { SidebarIconName } from "../components/navigation/SidebarIcon";
+import { useAuth } from "../hooks/useAuth";
+import { getLevelInfo } from "../utils/level-calculator";
+import "./LearningLayout.css";
 
 interface NavigationItem {
-  to: string
-  label: string
-  icon: SidebarIconName
+  to: string;
+  label: string;
+  icon: SidebarIconName;
 }
 
 const baseNavigationItems: NavigationItem[] = [
-  { to: '/learn', label: 'HỌC', icon: 'learn' },
+  { to: "/learn", label: "HỌC", icon: "learn" },
   {
-    to: '/vocabularies/learned',
-    label: 'TỪ VỰNG ĐÃ HỌC',
-    icon: 'vocabulary',
+    to: "/vocabularies/learned",
+    label: "TỪ VỰNG ĐÃ HỌC",
+    icon: "vocabulary",
   },
-  { to: '/pronunciation', label: 'PHÁT ÂM', icon: 'pronunciation' },
-  { to: '/leaderboard', label: 'BẢNG XẾP HẠNG', icon: 'leaderboard' },
-  { to: '/quests', label: 'NHIỆM VỤ', icon: 'quests' },
-  { to: '/shop', label: 'CỬA HÀNG', icon: 'shop' },
-  { to: '/profile', label: 'HỒ SƠ', icon: 'profile' },
-]
+  { to: "/pronunciation", label: "PHÁT ÂM", icon: "pronunciation" },
+  { to: "/leaderboard", label: "BẢNG XẾP HẠNG", icon: "leaderboard" },
+  { to: "/quests", label: "NHIỆM VỤ", icon: "quests" },
+  { to: "/shop", label: "CỬA HÀNG", icon: "shop" },
+  { to: "/profile", label: "HỒ SƠ", icon: "profile" },
+];
 
 function FlameIcon() {
   return (
     <svg viewBox="0 0 24 24" aria-hidden="true">
       <path d="M13.2 2.5c.5 4.2-3.8 5.5-3.1 9.1.2 1 .8 1.8 1.7 2.4-.1-2 .9-3.5 2.6-4.7 2.4 2 3.6 4.2 3.3 6.8-.3 3.5-2.8 5.6-6 5.4-3.9-.2-6.3-3-5.7-6.9.7-4.6 5-6.7 7.2-12.1Z" />
     </svg>
-  )
+  );
 }
 
 function XpIcon() {
@@ -42,26 +42,37 @@ function XpIcon() {
     <svg viewBox="0 0 24 24" aria-hidden="true" fill="currentColor">
       <path d="M13 2L3 14h7v8l10-12h-7V2z" />
     </svg>
-  )
+  );
 }
 
 export default function LearningLayout() {
-  const { logout, user } = useAuth()
-  const location = useLocation()
-  const isLessonRoute = location.pathname.startsWith('/learn/lessons/')
+  const { logout, user } = useAuth();
+  const location = useLocation();
+  const isLessonRoute = location.pathname.startsWith("/learn/lessons/");
 
-  const totalXp = user?.stats.totalXp ?? 0
-  const levelInfo = getLevelInfo(totalXp)
+  const totalXp = user?.stats.totalXp ?? 0;
+  const levelInfo = getLevelInfo(totalXp);
 
   const checkIsActive = (to: string) => {
-    if (to === '/learn') {
-      return location.pathname === '/learn' || location.pathname.startsWith('/learn/')
+    if (to === "/learn") {
+      return (
+        location.pathname === "/learn" ||
+        location.pathname.startsWith("/learn/")
+      );
     }
-    return location.pathname === to || location.pathname.startsWith(`${to}/`)
-  }
+    if (to === "/vocabularies/learned") {
+      return (
+        location.pathname.startsWith("/vocabularies/") ||
+        location.pathname === "/vocabulary"
+      );
+    }
+    return location.pathname === to || location.pathname.startsWith(`${to}/`);
+  };
 
   return (
-    <div className={`learning-shell${isLessonRoute ? ' learning-shell--lesson' : ''}`}>
+    <div
+      className={`learning-shell${isLessonRoute ? " learning-shell--lesson" : ""}`}
+    >
       <RealtimeToast />
       <aside className="learning-sidebar">
         <NavLink className="app-brand" to="/learn" aria-label="LingoFox - Học">
@@ -72,7 +83,9 @@ export default function LearningLayout() {
           {baseNavigationItems.map((item) => (
             <div key={item.to} className="relative flex flex-col">
               <NavLink
-                className={() => `sidebar-link${checkIsActive(item.to) ? ' sidebar-link--active' : ''}`}
+                className={() =>
+                  `sidebar-link${checkIsActive(item.to) ? " sidebar-link--active" : ""}`
+                }
                 to={item.to}
               >
                 <span className={`sidebar-icon sidebar-icon--${item.icon}`}>
@@ -89,8 +102,13 @@ export default function LearningLayout() {
       <div className="learning-workspace">
         <header className="stats-navbar" aria-label="Thông tin học tập">
           <div className="stats-navbar__inner">
-            <div className="stat-item stat-item--language" title="Khóa học Tiếng Anh">
-              <span className="language-flag" aria-hidden="true">🇺🇸</span>
+            <div
+              className="stat-item stat-item--language"
+              title="Khóa học Tiếng Anh"
+            >
+              <span className="language-flag" aria-hidden="true">
+                🇺🇸
+              </span>
               <span className="stat-label">TIẾNG ANH</span>
             </div>
             <div
@@ -99,8 +117,12 @@ export default function LearningLayout() {
             >
               <XpIcon />
               <div className="stat-level-info">
-                <strong className="stat-level-num">Lv. {levelInfo.level}</strong>
-                <span className="stat-level-xp">{levelInfo.xpInCurrentLevel}/{levelInfo.xpRequiredForLevel} XP</span>
+                <strong className="stat-level-num">
+                  Lv. {levelInfo.level}
+                </strong>
+                <span className="stat-level-xp">
+                  {levelInfo.xpInCurrentLevel}/{levelInfo.xpRequiredForLevel} XP
+                </span>
               </div>
             </div>
             <div className="stat-item stat-item--streak" title="Chuỗi ngày học">
@@ -121,5 +143,5 @@ export default function LearningLayout() {
         </div>
       </div>
     </div>
-  )
+  );
 }
