@@ -403,6 +403,55 @@
   line-height: 1.45;
 }
 
+.profile-logout {
+  display: flex;
+  justify-content: flex-end;
+  padding-top: 2px;
+}
+
+.profile-logout button {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 9px;
+  min-width: 190px;
+  min-height: 48px;
+  padding: 0 18px;
+  color: #fff;
+  background: #ff4b4b;
+  border: 0;
+  border-radius: 13px;
+  box-shadow: 0 5px 0 #d93636;
+  font-size: 13px;
+  font-weight: 900;
+  letter-spacing: 0.5px;
+  cursor: pointer;
+}
+
+.profile-logout button:hover {
+  background: #ff5c5c;
+}
+
+.profile-logout button:active {
+  box-shadow: 0 2px 0 #d93636;
+  transform: translateY(3px);
+}
+
+.profile-logout button:focus-visible {
+  outline: 3px solid #ffb2b2;
+  outline-offset: 2px;
+}
+
+.profile-logout svg {
+  width: 20px;
+  height: 20px;
+  fill: none;
+  stroke: currentColor;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: 2.2;
+}
+
 .profile-right-rail {
   position: sticky;
   top: 108px;
@@ -581,6 +630,7 @@
   .profile-stats-grid { grid-template-columns: 1fr; }
   .password-requirements { grid-template-columns: 1fr; }
   .profile-submit { width: 100%; }
+  .profile-logout button { width: 100%; }
   .profile-right-rail { grid-template-columns: 1fr; }
 }
 
