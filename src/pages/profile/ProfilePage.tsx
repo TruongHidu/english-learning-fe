@@ -2,6 +2,7 @@ import ChangePasswordForm from '../../components/profile/ChangePasswordForm'
 import ProfileHeader from '../../components/profile/ProfileHeader'
 import ProfileStats from '../../components/profile/ProfileStats'
 import UpdateDisplayNameForm from '../../components/profile/UpdateDisplayNameForm'
+import { useAuth } from '../../hooks/useAuth'
 import { useProfile } from '../../hooks/useProfile'
 import type { UserProfile } from '../../types/user.types'
 import './ProfilePage.css'
@@ -56,6 +57,7 @@ function ProfileError({ message, onRetry }: { message: string; onRetry(): void }
 }
 
 export default function ProfilePage() {
+  const { logout } = useAuth()
   const { error, isLoading, mergeUpdatedName, profile, retry } = useProfile()
 
   if (isLoading) return <ProfileLoading />
@@ -88,6 +90,15 @@ export default function ProfilePage() {
         ) : (
           <ChangePasswordForm />
         )}
+
+        <div className="profile-logout">
+          <button type="button" onClick={logout}>
+            <svg viewBox="0 0 24 24" aria-hidden="true">
+              <path d="M9 4H5a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h4M16 17l5-5-5-5M21 12H9" />
+            </svg>
+            ĐĂNG XUẤT
+          </button>
+        </div>
       </main>
 
       <aside className="right-rail profile-right-rail" aria-label="Tổng quan hồ sơ">
