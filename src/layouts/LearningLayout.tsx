@@ -22,9 +22,6 @@ const baseNavigationItems: NavigationItem[] = [
     label: "TỪ VỰNG ĐÃ HỌC",
     icon: "vocabulary",
   },
-  { to: "/pronunciation", label: "PHÁT ÂM", icon: "pronunciation" },
-  { to: "/leaderboard", label: "BẢNG XẾP HẠNG", icon: "leaderboard" },
-  { to: "/quests", label: "NHIỆM VỤ", icon: "quests" },
   { to: "/shop", label: "CỬA HÀNG", icon: "shop" },
   { to: "/profile", label: "HỒ SƠ", icon: "profile" },
 ];
@@ -102,15 +99,7 @@ export default function LearningLayout() {
       <div className="learning-workspace">
         <header className="stats-navbar" aria-label="Thông tin học tập">
           <div className="stats-navbar__inner">
-            <div
-              className="stat-item stat-item--language"
-              title="Khóa học Tiếng Anh"
-            >
-              <span className="language-flag" aria-hidden="true">
-                🇺🇸
-              </span>
-              <span className="stat-label">TIẾNG ANH</span>
-            </div>
+
             <div
               className="stat-item stat-item--level"
               title={`Cấp độ ${levelInfo.level} • ${levelInfo.xpInCurrentLevel}/${levelInfo.xpRequiredForLevel} XP để lên Cấp ${levelInfo.level + 1}`}
