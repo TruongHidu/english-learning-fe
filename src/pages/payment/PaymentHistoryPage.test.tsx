@@ -6,13 +6,15 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { PaymentDetail } from '../../types/payment.types'
 import PaymentHistoryPage from './PaymentHistoryPage'
 import { pendingPaymentStorage } from '../../utils/pending-payment'
+import { sepayFixture, sepayDetail } from '../../test/payment-fixtures'
 
-const mocks = vi.hoisted(() => ({ getHistory: vi.fn(), retryPayment: vi.fn(), cancelPayment: vi.fn(), assign: vi.fn() }))
+const mocks = vi.hoisted(() => ({ getHistory: vi.fn(), retryPayment: vi.fn(), cancelPayment: vi.fn(), assign: vi.fn(), getPayment: vi.fn(), update: vi.fn() }))
 
 vi.mock('../../services/payment.service', () => ({
-  paymentService: { getHistory: mocks.getHistory, retryPayment: mocks.retryPayment, cancelPayment: mocks.cancelPayment },
+  paymentService: { getHistory: mocks.getHistory, retryPayment: mocks.retryPayment, cancelPayment: mocks.cancelPayment, getPayment: mocks.getPayment },
 }))
 vi.mock('../../utils/browser-navigation', () => ({ browserNavigation: { assign: mocks.assign } }))
+vi.mock('../../hooks/useAuth', () => ({ useAuth: () => ({ user: { id: 'user-1' }, updateCachedUser: mocks.update }) }))
 
 const transaction: PaymentDetail = {
   paymentId: 'aaaaaaaaaaaaaaaaaaaaaaaa',
@@ -42,6 +44,21 @@ function renderHistory() {
 describe('PaymentHistoryPage', () => {
   beforeEach(() => vi.resetAllMocks())
   afterEach(() => vi.useRealTimers())
+
+  it('pending SePay retries only on user action and opens the returned QR with the same identity', async () => {
+    const pending = sepayDetail()
+    mocks.getHistory.mockResolvedValue({ payments: [pending], total: 1, page: 1, totalPages: 1 })
+    mocks.getPayment.mockResolvedValue(pending)
+    mocks.retryPayment.mockResolvedValue(sepayFixture())
+    renderHistory()
+    const button = await screen.findByRole('button', { name: `Thanh toán lại ${pending.transactionCode}` })
+    expect(mocks.retryPayment).not.toHaveBeenCalled()
+    expect(screen.queryByRole('img')).not.toBeInTheDocument()
+    fireEvent.click(button)
+    expect(await screen.findByRole('img', { name: /VietQR/ })).toHaveAttribute('src', sepayFixture().qrUrl)
+    expect(mocks.retryPayment).toHaveBeenCalledWith(pending.paymentId, expect.any(AbortSignal))
+    expect(mocks.assign).not.toHaveBeenCalled()
+  })
 
   function pendingHistory() {
     const pending = { ...transaction, status: 'PENDING' as const, paidAt: null,

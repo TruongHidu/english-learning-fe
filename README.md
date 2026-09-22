@@ -92,6 +92,8 @@ npm run build
 ```
 # Authentication sessions
 
+Tài liệu tích hợp SePay, danh sách file thay đổi và checklist kiểm thử: [SePay frontend](docs/sepay-integration.md).
+
 The browser keeps access JWTs in memory only. On page reload, AuthProvider calls
 `POST /auth/refresh` with the HttpOnly cookie, then loads `/users/me` before finishing
 initialization. Login/refresh responses never expose the refresh token to JavaScript.

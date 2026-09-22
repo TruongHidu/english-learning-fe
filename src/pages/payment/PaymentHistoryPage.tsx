@@ -1,11 +1,15 @@
 import { useEffect, useRef, useState } from 'react'
-import { keepPreviousData, useQuery, useQueryClient } from '@tanstack/react-query'
-import { Link, useLocation } from 'react-router-dom'
+import { useQuery, useQueryClient } from '@tanstack/react-query'
+import { Link, useLocation, useNavigate } from 'react-router-dom'
 import { paymentService } from '../../services/payment.service'
 import { formatPaymentDate, formatVnd, PAYMENT_STATUS_LABELS } from '../../utils/payment'
 import { getPaymentErrorMessage } from '../../utils/payment-errors'
 import './PaymentPages.css'
 import ConfirmModal from '../../components/admin/ConfirmModal'
+import SepayCheckout from '../../components/payment/SepayCheckout'
+import { useAuth } from '../../hooks/useAuth'
+import { isSepayCheckout, isVnpayCheckout } from '../../utils/checkout-validation'
+import type { SepayCheckoutData } from '../../types/payment.types'
 import type { PaymentDetail } from '../../types/payment.types'
 import { pendingPaymentStorage } from '../../utils/pending-payment'
 import { browserNavigation } from '../../utils/browser-navigation'
@@ -15,6 +19,17 @@ const PAGE_SIZE = 20
 
 export default function PaymentHistoryPage() {
   const location = useLocation()
+  const navigate = useNavigate()
+  const { user } = useAuth()
+  const [sepay, setSepay] = useState<{ userId: string; data: SepayCheckoutData } | null>(null)
+  const actionController = useRef<AbortController | null>(null)
+  useEffect(() => {
+    setSepay(null)
+    setCancelTarget(null)
+    inFlight.current = false
+    setBusyId(null)
+    return () => actionController.current?.abort()
+  }, [user?.id])
   const queryClient = useQueryClient()
   const [cancelTarget, setCancelTarget] = useState<PaymentDetail | null>(null)
   const [busyId, setBusyId] = useState<string | null>(null)
@@ -23,9 +38,9 @@ export default function PaymentHistoryPage() {
   const [actionError, setActionError] = useState('')
   const [page, setPage] = useState(1)
   const { data, error, isLoading, isFetching, refetch } = useQuery({
-    queryKey: ['payments', 'me', page, PAGE_SIZE],
+    queryKey: ['payments', 'me', user?.id, page, PAGE_SIZE],
     queryFn: ({ signal }) => paymentService.getHistory(page, PAGE_SIZE, signal),
-    placeholderData: keepPreviousData,
+    placeholderData: (previous, query) => query?.queryKey[2] === user?.id ? previous : undefined,
   })
   const pending = data?.payments.find(payment => payment.status === 'PENDING')
   useEffect(() => {
@@ -52,18 +67,38 @@ export default function PaymentHistoryPage() {
     setActionError('')
     setNotice('')
     let redirected = false
+    const controller = new AbortController()
+    actionController.current = controller
     try {
-      const result = await paymentService.retryPayment(payment.paymentId)
+      const result = payment.paymentMethod === 'SEPAY'
+        ? await paymentService.retryPayment(payment.paymentId, controller.signal)
+        : await paymentService.retryPayment(payment.paymentId)
+      if (controller.signal.aborted) return
+      if (payment.paymentMethod === 'SEPAY') {
+        if (!isSepayCheckout(result) || result.paymentId !== payment.paymentId || result.transactionCode !== payment.transactionCode) {
+          throw new Error('Thông tin thanh toán SePay không hợp lệ.')
+        }
+        setSepay({ userId: user?.id ?? '', data: result })
+        await refreshPayments()
+        return
+      }
+      if (!isVnpayCheckout(result)) throw new Error('Đường dẫn thanh toán VNPay không hợp lệ.')
       pendingPaymentStorage.save({ paymentId: result.paymentId, transactionCode: result.transactionCode,
         createdAt: payment.createdAt })
       await refreshPayments()
+      if (controller.signal.aborted) return
       browserNavigation.assign(result.paymentUrl)
       redirected = true
     } catch (error) {
+      if (controller.signal.aborted) return
       setActionError(getPaymentErrorMessage(error))
+      if (payment.paymentMethod === 'SEPAY' && (error as { code?: string }).code === 'PAYMENT_NOT_PENDING') {
+        const detail = await paymentService.getPayment(payment.paymentId, controller.signal).catch(() => null)
+        if (detail && !controller.signal.aborted) setNotice(PAYMENT_STATUS_LABELS[detail.status])
+      }
       await refreshPayments()
     } finally {
-      if (!redirected) { inFlight.current = false; setBusyId(null) }
+      if (!redirected && !controller.signal.aborted) { inFlight.current = false; setBusyId(null) }
     }
   }
   async function cancelPayment() {
@@ -72,33 +107,42 @@ export default function PaymentHistoryPage() {
     setBusyId(cancelTarget.paymentId)
     setActionError('')
     setNotice('')
+    const controller = new AbortController()
+    actionController.current = controller
     try {
-      const result = await paymentService.cancelPayment(cancelTarget.paymentId)
+      const result = cancelTarget.paymentMethod === 'SEPAY'
+        ? await paymentService.cancelPayment(cancelTarget.paymentId, controller.signal)
+        : await paymentService.cancelPayment(cancelTarget.paymentId)
+      if (controller.signal.aborted) return
       pendingPaymentStorage.clearIfMatches(result.paymentId)
       setNotice(result.status === 'EXPIRED' ? 'Giao dịch đã hết hạn' : 'Đã hủy giao dịch')
       setCancelTarget(null)
       await refreshPayments()
     } catch (error) {
+      if (controller.signal.aborted) return
       setActionError(getPaymentErrorMessage(error))
       setCancelTarget(null)
       await refreshPayments()
-    } finally { inFlight.current = false; setBusyId(null) }
+    } finally { if (!controller.signal.aborted) { inFlight.current = false; setBusyId(null) } }
   }
 
   return (
     <main className="payment-history-page">
       <header className="payment-history-header">
         <div>
-          <span>VNPAY SANDBOX</span>
+          <span>VNPAY / SEPAY</span>
           <h1>Lịch sử thanh toán</h1>
           <p>Theo dõi các lần mua gói kim cương và trạng thái xác nhận từ máy chủ.</p>
         </div>
         <Link to="/shop" className="payment-primary-button">Mua kim cương</Link>
       </header>
+      {sepay && sepay.userId === (user?.id ?? '') && <SepayCheckout key={sepay.data.paymentId} checkout={sepay.data}
+        onReturnToShop={() => navigate('/shop')}
+        onClose={() => { setSepay(null); void refreshPayments() }} />}
       {notice && <p role="status" aria-live="polite">{notice}</p>}
       {actionError && <p role="alert">{actionError}</p>}
       <ConfirmModal isOpen={Boolean(cancelTarget)} title="Hủy giao dịch?"
-        message={`Hủy giao dịch ${cancelTarget?.transactionCode ?? ''}? Bạn sẽ phải tạo giao dịch mới nếu muốn mua lại. Nếu bạn đã hoàn tất thanh toán trên VNPay, hãy quay về trang kết quả trước.`}
+        message={`Hủy giao dịch ${cancelTarget?.transactionCode ?? ''}? Bạn sẽ phải tạo giao dịch mới nếu muốn mua lại. Nếu đã chuyển khoản hoặc hoàn tất thanh toán, hãy kiểm tra trạng thái trước.`}
         confirmLabel="Xác nhận hủy" cancelLabel="Quay lại" isLoading={busyId !== null}
         onConfirm={() => void cancelPayment()} onClose={() => { if (!inFlight.current) setCancelTarget(null) }} />
 

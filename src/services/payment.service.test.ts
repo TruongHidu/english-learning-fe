@@ -11,6 +11,12 @@ vi.mock('../api/axios', () => ({
 
 describe('paymentService', () => {
   beforeEach(() => vi.clearAllMocks())
+  it('SePay uses the shared client and sends only packageId, with cancellation', async () => {
+    vi.mocked(api.post).mockResolvedValue({ data: { data: {} } })
+    const signal = new AbortController().signal
+    await paymentService.checkoutSepay('package-id', signal)
+    expect(api.post).toHaveBeenCalledWith('/payments/sepay/checkout', { packageId: 'package-id' }, { timeout: 15000, signal })
+  })
   it('pending accepts null and actions send no client-controlled payment fields', async () => {
     vi.mocked(api.get).mockResolvedValue({ data: { data: null } })
     expect(await paymentService.getPendingPayment()).toBeNull()

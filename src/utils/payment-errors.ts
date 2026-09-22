@@ -6,6 +6,9 @@ export function getPaymentErrorMessage(
 ): string {
   const apiError = error as Partial<ApiError> | undefined
 
+  if (apiError?.code === 'PAYMENT_NOT_CONFIGURED') return 'SePay tạm thời không khả dụng. Vui lòng chọn VNPay hoặc thử lại sau.'
+  if (apiError?.code === 'PAYMENT_EXPIRED') return apiError.message || 'Giao dịch đã hết hạn. Vui lòng quay lại chọn gói để tạo giao dịch mới.'
+
   if (apiError?.status === 404) {
     return 'Không tìm thấy giao dịch hoặc giao dịch không thuộc tài khoản của bạn.'
   }

@@ -1,6 +1,24 @@
 import type { ApiSuccess } from './api.types'
 
 export type PaymentStatus = 'PENDING' | 'SUCCESS' | 'FAILED' | 'CANCELLED' | 'EXPIRED'
+export type PaymentMethod = 'VNPAY' | 'SEPAY'
+
+export interface SepayCheckoutData {
+  paymentId: string
+  transactionCode: string
+  paymentMethod: 'SEPAY'
+  status: PaymentStatus
+  amount: number
+  currency: 'VND'
+  qrUrl: string
+  bankCode: string
+  accountNumber: string
+  accountName: string
+  transferContent: string
+  expiresAt: string
+}
+
+export type RetryCheckoutData = CheckoutResponse | SepayCheckoutData
 
 export interface CheckoutResponse {
   paymentId: string
@@ -17,7 +35,7 @@ export interface PaymentDetail {
   amount: number
   diamondAmount: number
   currency: 'VND'
-  paymentMethod: 'VNPAY'
+  paymentMethod: PaymentMethod
   status: PaymentStatus
   createdAt: string
   paidAt: string | null

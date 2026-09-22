@@ -1,36 +1,41 @@
 import type { ReactElement } from 'react'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
-import { act, render, screen, waitFor } from '@testing-library/react'
+import { act, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { MemoryRouter, Route, Routes } from 'react-router-dom'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import type { ShopData } from '../../types/shop.types'
 import { PENDING_PAYMENT_STORAGE_KEY } from '../../utils/pending-payment'
 import ShopPage from './ShopPage'
+import { sepayFixture, sepayDetail } from '../../test/payment-fixtures'
 
 const mocks = vi.hoisted(() => ({
   getShop: vi.fn(),
   purchaseHeart: vi.fn(),
   checkout: vi.fn(),
+  checkoutSepay: vi.fn(),
+  getPayment: vi.fn(),
   getPendingPayment: vi.fn(),
   assign: vi.fn(),
   updateCachedUser: vi.fn(),
+  userId: 'user-1' as string | null,
 }))
 
 vi.mock('../../services/shop.service', () => ({
   shopService: { getShop: mocks.getShop, purchaseHeart: mocks.purchaseHeart },
 }))
 vi.mock('../../services/payment.service', () => ({
-  paymentService: { checkout: mocks.checkout, getPendingPayment: mocks.getPendingPayment },
+  paymentService: { checkout: mocks.checkout, checkoutSepay: mocks.checkoutSepay, getPayment: mocks.getPayment, getPendingPayment: mocks.getPendingPayment },
 }))
 vi.mock('../../utils/browser-navigation', () => ({
   browserNavigation: { assign: mocks.assign },
 }))
 vi.mock('../../hooks/useAuth', () => ({
   useAuth: () => ({
-    user: {
+    user: mocks.userId ? {
+      id: mocks.userId,
       stats: { diamond: 100, currentHeart: 4, maxHeart: 5 },
-    },
+    } : null,
     updateCachedUser: mocks.updateCachedUser,
   }),
 }))
@@ -83,8 +88,84 @@ function renderShop(): ReactElement {
 describe('ShopPage - thanh toán kim cương', () => {
   beforeEach(() => {
     vi.clearAllMocks()
+    mocks.userId = 'user-1'
     mocks.getShop.mockResolvedValue(shopFixture)
     mocks.getPendingPayment.mockResolvedValue(null)
+    mocks.getPayment.mockResolvedValue(sepayDetail())
+    mocks.checkoutSepay.mockResolvedValue(sepayFixture())
+  })
+
+  it('SePay conflict refreshes pending and opens existing payment management', async () => {
+    mocks.checkoutSepay.mockRejectedValue({ code: 'PAYMENT_PENDING_EXISTS', message: 'Giao dịch đang chờ' })
+    renderShop()
+    const user = userEvent.setup()
+    await screen.findByText('Túi Đá Quý')
+    await user.click(screen.getAllByRole('button', { name: 'MUA NGAY' })[0])
+    await user.click(screen.getByRole('radio', { name: /SePay/ }))
+    await user.click(screen.getByRole('button', { name: 'TIẾP TỤC VỚI SEPAY' }))
+    expect(await screen.findByRole('heading', { name: 'Lịch sử thanh toán' })).toBeInTheDocument()
+    expect(mocks.getPendingPayment.mock.calls.length).toBeGreaterThanOrEqual(2)
+    expect(mocks.assign).not.toHaveBeenCalled()
+  })
+
+  it.each(['user-2', null])('cleans up SePay when account changes to %s', async nextUser => {
+    renderShop()
+    const user = userEvent.setup()
+    await screen.findByText('Túi Đá Quý')
+    await user.click(screen.getAllByRole('button', { name: 'MUA NGAY' })[0])
+    await user.click(screen.getByRole('radio', { name: /SePay/ }))
+    await user.click(screen.getByRole('button', { name: 'TIẾP TỤC VỚI SEPAY' }))
+    await screen.findByRole('img', { name: /VietQR/ })
+    const signal = mocks.getPayment.mock.calls[0][1] as AbortSignal
+    mocks.userId = nextUser
+    fireEvent(window, new Event('pageshow'))
+    await waitFor(() => expect(screen.queryByRole('img', { name: /VietQR/ })).not.toBeInTheDocument())
+    expect(signal.aborted).toBe(true)
+  })
+
+  it('defaults to VNPay; selecting SePay does not checkout until confirmation and never redirects', async () => {
+    renderShop()
+    const user = userEvent.setup()
+    await screen.findByText('Túi Đá Quý')
+    await user.click(screen.getAllByRole('button', { name: 'MUA NGAY' })[0])
+    expect(screen.getByRole('radio', { name: 'VNPay' })).toBeChecked()
+    await user.click(screen.getByRole('radio', { name: /SePay/ }))
+    expect(mocks.checkoutSepay).not.toHaveBeenCalled()
+    await user.dblClick(screen.getByRole('button', { name: 'TIẾP TỤC VỚI SEPAY' }))
+    expect(await screen.findByRole('img', { name: /VietQR/ })).toBeInTheDocument()
+    expect(mocks.checkoutSepay).toHaveBeenCalledTimes(1)
+    expect(mocks.checkoutSepay).toHaveBeenCalledWith('aaaaaaaaaaaaaaaaaaaaaaaa', expect.any(AbortSignal))
+    expect(mocks.checkout).not.toHaveBeenCalled()
+    expect(mocks.assign).not.toHaveBeenCalled()
+  })
+
+  it('SePay not configured leaves VNPay usable', async () => {
+    mocks.checkoutSepay.mockRejectedValue({ code: 'PAYMENT_NOT_CONFIGURED' })
+    mocks.checkout.mockResolvedValue({ ...sepayFixture(), paymentMethod: 'VNPAY', paymentUrl: 'https://sandbox.vnpayment.vn/test' })
+    renderShop()
+    const user = userEvent.setup()
+    await screen.findByText('Túi Đá Quý')
+    await user.click(screen.getAllByRole('button', { name: 'MUA NGAY' })[0])
+    await user.click(screen.getByRole('radio', { name: /SePay/ }))
+    await user.click(screen.getByRole('button', { name: 'TIẾP TỤC VỚI SEPAY' }))
+    expect(await screen.findByRole('alert')).toHaveTextContent('SePay tạm thời không khả dụng')
+    await user.click(screen.getByRole('radio', { name: 'VNPay' }))
+    await user.click(screen.getByRole('button', { name: 'TIẾP TỤC VỚI VNPAY' }))
+    expect(mocks.assign).toHaveBeenCalledWith('https://sandbox.vnpayment.vn/test')
+  })
+
+  it.each(['VNPAY', 'SEPAY'])('rejects malformed %s checkout before redirect/QR', async method => {
+    mocks.checkout.mockResolvedValue({ paymentUrl: 'javascript:alert(1)' })
+    mocks.checkoutSepay.mockResolvedValue({ ...sepayFixture(), qrUrl: 'http://bad.test' })
+    renderShop()
+    const user = userEvent.setup()
+    await screen.findByText('Túi Đá Quý')
+    await user.click(screen.getAllByRole('button', { name: 'MUA NGAY' })[0])
+    if (method === 'SEPAY') await user.click(screen.getByRole('radio', { name: /SePay/ }))
+    await user.click(screen.getByRole('button', { name: `TIẾP TỤC VỚI ${method}` }))
+    expect(await screen.findByRole('alert')).toHaveTextContent('không hợp lệ')
+    expect(screen.queryByRole('img', { name: /VietQR/ })).not.toBeInTheDocument()
+    expect(mocks.assign).not.toHaveBeenCalled()
   })
 
   it('render gói theo orderIndex và định dạng giá VND', async () => {

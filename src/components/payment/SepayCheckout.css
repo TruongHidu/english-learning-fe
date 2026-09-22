@@ -1,0 +1,15 @@
+.sepay-overlay { position: fixed; inset: 0; z-index: 45; background: #0f172a99; display: grid; place-items: center; padding: 16px; }
+.sepay-dialog { background: white; color: #334155; border-radius: 20px; padding: 24px; width: min(100%, 520px); max-height: 92dvh; overflow: auto; box-shadow: 0 12px 40px #0f172a33; }
+.sepay-dialog h2 { font-size: 24px; font-weight: 800; }
+.sepay-dialog p { margin: 12px 0; }
+.sepay-qr { display: block; width: min(100%, 280px); height: auto; object-fit: contain; margin: 12px auto; }
+.sepay-qr[hidden] { display: none; }
+.sepay-dialog dl > div { border-bottom: 1px solid #e2e8f0; padding: 10px 0; }
+.sepay-dialog dt { font-size: 14px; }
+.sepay-dialog dd { font-weight: 700; overflow-wrap: anywhere; margin: 0; }
+.sepay-dialog button { min-height: 44px; padding: 8px 12px; margin: 4px; border: 1px solid #cbd5e1; border-radius: 10px; cursor: pointer; }
+.sepay-dialog button:disabled { opacity: .5; cursor: default; }
+.sepay-dialog button:focus-visible { outline: 3px solid #0284c7; }
+.sepay-notice { background: #ecfdf5; padding: 10px; border-radius: 8px; }
+.payment-method-selector { display: grid; gap: 10px; margin: 16px 0; text-align: left; }
+.payment-method-selector label { display: flex; align-items: center; gap: 10px; min-height: 44px; cursor: pointer; }

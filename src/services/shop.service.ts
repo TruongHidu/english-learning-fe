@@ -1,8 +1,8 @@
 import api from '../api/axios'
 import type { PurchaseHeartApiResponse, PurchaseHeartData, ShopApiResponse, ShopData } from '../types/shop.types'
 export const shopService = {
-  async getShop(): Promise<ShopData> {
-    const response = await api.get<ShopApiResponse>('/shop')
+  async getShop(signal?: AbortSignal): Promise<ShopData> {
+    const response = await api.get<ShopApiResponse>('/shop', signal ? { signal } : undefined)
     return response.data.data
   },
   async purchaseHeart(): Promise<PurchaseHeartData> {

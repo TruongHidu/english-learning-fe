@@ -12,6 +12,10 @@ import { getPaymentErrorMessage } from '../../utils/payment-errors'
 import { pendingPaymentStorage } from '../../utils/pending-payment'
 import { getShopErrorMessage } from '../../utils/shop-errors'
 import './ShopPage.css'
+import SepayCheckout from '../../components/payment/SepayCheckout'
+import type { PaymentMethod, SepayCheckoutData } from '../../types/payment.types'
+import { isSepayCheckout, isVnpayCheckout } from '../../utils/checkout-validation'
+import { formatPaymentDate } from '../../utils/payment'
 import { usePaymentDeadline } from '../../hooks/usePaymentDeadline'
 
 /* ==========================================================================
@@ -190,12 +194,16 @@ interface CheckoutDialogProps {
   paymentPackage: ShopDiamondPackage
   isCheckingOut: boolean
   error: string
+  method: PaymentMethod
+  onMethodChange(method: PaymentMethod): void
   onConfirm(): void
   onClose(): void
 }
 
 function CheckoutDialog({
   paymentPackage,
+  method,
+  onMethodChange,
   isCheckingOut,
   error,
   onConfirm,
@@ -222,7 +230,7 @@ function CheckoutDialog({
       if (event.key !== 'Tab') return
 
       const focusableElements = Array.from(
-        dialogRef.current?.querySelectorAll<HTMLElement>('button:not(:disabled), a[href]') ?? [],
+        dialogRef.current?.querySelectorAll<HTMLElement>('button:not(:disabled), input:not(:disabled), a[href]') ?? [],
       )
       if (focusableElements.length === 0) return
       const firstElement = focusableElements[0]
@@ -262,8 +270,13 @@ function CheckoutDialog({
         <div className="shop-modal-icon-box"><GemChestIllustration /></div>
         <h3 id="checkout-modal-title" className="shop-modal-title">Xác nhận thanh toán</h3>
         <p id="checkout-modal-description" className="shop-modal-desc">
-          Bạn sắp mua <strong>{paymentPackage.name}</strong> qua VNPay Sandbox.
+          Bạn sắp mua <strong>{paymentPackage.name}</strong> qua {method === 'VNPAY' ? 'VNPay Sandbox' : 'SePay'}.
         </p>
+        <fieldset className="payment-method-selector" disabled={isCheckingOut}>
+          <legend>Phương thức thanh toán</legend>
+          <label><input type="radio" name="paymentMethod" checked={method === 'VNPAY'} onChange={() => onMethodChange('VNPAY')} />VNPay</label>
+          <label><input type="radio" name="paymentMethod" checked={method === 'SEPAY'} onChange={() => onMethodChange('SEPAY')} />SePay – Quét mã QR ngân hàng</label>
+        </fieldset>
         <div className="shop-checkout-summary">
           <div><span>Tổng kim cương</span><strong>{paymentPackage.totalDiamond.toLocaleString('vi-VN')} 💎</strong></div>
           <div><span>Thanh toán</span><strong>{formatVnd(paymentPackage.price)}</strong></div>
@@ -278,7 +291,7 @@ function CheckoutDialog({
             disabled={isCheckingOut}
             onClick={onConfirm}
           >
-            {isCheckingOut ? 'ĐANG TẠO GIAO DỊCH…' : 'TIẾP TỤC VỚI VNPAY'}
+            {isCheckingOut ? 'ĐANG TẠO GIAO DỊCH…' : `TIẾP TỤC VỚI ${method}`}
           </button>
           <button
             type="button"
@@ -309,9 +322,19 @@ export default function ShopPage() {
   const [selectedPackage, setSelectedPackage] = useState<ShopDiamondPackage | null>(null)
   const [checkoutPackageId, setCheckoutPackageId] = useState<string | null>(null)
   const [checkoutError, setCheckoutError] = useState('')
+  const [method, setMethod] = useState<PaymentMethod>('VNPAY')
+  const [sepay, setSepay] = useState<{ userId: string; data: SepayCheckoutData } | null>(null)
+  const checkoutController = useRef<AbortController | null>(null)
+  useEffect(() => {
+    setSepay(null)
+    setSelectedPackage(null)
+    checkoutInFlightRef.current = false
+    setCheckoutPackageId(null)
+    return () => { checkoutController.current?.abort() }
+  }, [user?.id])
   const paymentQueryClient = useQueryClient()
   const { data: pendingPayment, isLoading: pendingLoading, isError: pendingError, refetch: refetchPending } = useQuery({
-    queryKey: ['payments', 'pending'],
+    queryKey: ['payments', 'pending', user?.id],
     queryFn: ({ signal }) => paymentService.getPendingPayment(signal),
     staleTime: 0,
   })
@@ -327,7 +350,7 @@ export default function ShopPage() {
     refetch: refetchShop,
   } = useQuery({
     queryKey: ['shop'],
-    queryFn: shopService.getShop,
+    queryFn: ({ signal }) => shopService.getShop(signal),
   })
 
   useEffect(() => {
@@ -526,6 +549,7 @@ export default function ShopPage() {
     if (pendingPayment) { navigate('/payments/history'); return }
     if (pendingLoading || pendingError) return
     setCheckoutError('')
+    setMethod('VNPAY')
     setSelectedPackage(paymentPackage)
   }
 
@@ -543,9 +567,22 @@ export default function ShopPage() {
     setCheckoutPackageId(selectedPackage.id)
     setCheckoutError('')
     let redirectStarted = false
+    const controller = new AbortController()
+    checkoutController.current = controller
 
     try {
-      const checkout = await paymentService.checkout(selectedPackage.id)
+      const checkout = method === 'SEPAY'
+        ? await paymentService.checkoutSepay(selectedPackage.id, controller.signal)
+        : await paymentService.checkout(selectedPackage.id)
+      if (controller.signal.aborted) return
+      if (method === 'SEPAY') {
+        if (!isSepayCheckout(checkout)) throw new Error('Thông tin thanh toán SePay không hợp lệ. Vui lòng kiểm tra lịch sử thanh toán.')
+        setSepay({ userId: user?.id ?? '', data: checkout })
+        setSelectedPackage(null)
+        void paymentQueryClient.invalidateQueries({ queryKey: ['payments'] })
+        return
+      }
+      if (!isVnpayCheckout(checkout)) throw new Error('Đường dẫn thanh toán VNPay không hợp lệ.')
       const nextPendingPayment = {
         paymentId: checkout.paymentId,
         transactionCode: checkout.transactionCode,
@@ -556,15 +593,17 @@ export default function ShopPage() {
       browserNavigation.assign(checkout.paymentUrl)
       redirectStarted = true
     } catch (error) {
+      if (controller.signal.aborted) return
       setCheckoutError(getPaymentErrorMessage(error))
       if ((error as { code?: string }).code === 'PAYMENT_PENDING_EXISTS') {
         await refetchPending()
+        if (controller.signal.aborted) return
         setSelectedPackage(null)
         navigate('/payments/history', { state: { paymentNotice: getPaymentErrorMessage(error) } })
       }
       void queryClient.invalidateQueries({ queryKey: ['shop'] })
     } finally {
-      if (!redirectStarted) {
+      if (!redirectStarted && !controller.signal.aborted) {
         checkoutInFlightRef.current = false
         setCheckoutPackageId(null)
       }
@@ -643,6 +682,8 @@ export default function ShopPage() {
             <div>
               <strong>Có giao dịch đang chờ xác nhận</strong>
               <span>Mã {pendingPayment.transactionCode}</span>
+              <span>{pendingPayment.paymentMethod} · {pendingPayment.packageName} · {formatVnd(pendingPayment.amount)}</span>
+              <span>Hết hạn: {formatPaymentDate(pendingPayment.expiresAt)}</span>
             </div>
             <button type="button" onClick={() => navigate('/payments/history')}>THANH TOÁN HOẶC HỦY</button>
           </aside>
@@ -910,9 +951,14 @@ export default function ShopPage() {
         </div>
       </aside>
 
+      {sepay && sepay.userId === (user?.id ?? '') && <SepayCheckout key={sepay.data.paymentId} checkout={sepay.data}
+        onReturnToShop={() => { setSepay(null); void refetchPending() }}
+        onClose={() => { setSepay(null); void refetchPending() }} />}
       {selectedPackage && (
         <CheckoutDialog
           paymentPackage={selectedPackage}
+          method={method}
+          onMethodChange={setMethod}
           isCheckingOut={checkoutPackageId === selectedPackage.id}
           error={checkoutError}
           onConfirm={() => void handleConfirmPackageCheckout()}
