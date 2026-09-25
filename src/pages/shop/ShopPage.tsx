@@ -282,7 +282,11 @@ function CheckoutDialog({
           <div><span>Thanh toán</span><strong>{formatVnd(paymentPackage.price)}</strong></div>
         </div>
         {error && <p className="shop-checkout-error" role="alert">{error}</p>}
-        <p className="shop-checkout-note">Bạn sẽ được chuyển tới cổng VNPay để hoàn tất giao dịch.</p>
+        <p className="shop-checkout-note">
+          {method === 'VNPAY'
+            ? 'Bạn sẽ được chuyển tới cổng VNPay để hoàn tất giao dịch.'
+            : 'Mã QR và thông tin chuyển khoản sẽ hiển thị sau khi tạo giao dịch SePay.'}
+        </p>
         <div className="shop-modal-actions">
           <button
             ref={confirmButtonRef}
