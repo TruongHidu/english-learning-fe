@@ -1,0 +1,21 @@
+name: english-learning-fe
+
+# Tên service đặt riêng để không trùng DNS với service "web" của pos-saas
+# khi nối chung network với Caddy.
+services:
+  english-learning-fe:
+    build:
+      context: .
+      args:
+        VITE_API_BASE_URL: ${VITE_API_BASE_URL:-/api/v1}
+    image: english-learning-fe:latest
+    container_name: english-learning-fe
+    restart: unless-stopped
+    ports:
+      # Chỉ mở cho localhost của VPS (để curl kiểm tra); Caddy gọi qua docker network.
+      - "127.0.0.1:${WEB_HOST_PORT:-8080}:80"
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"

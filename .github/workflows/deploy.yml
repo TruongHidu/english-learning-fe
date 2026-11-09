@@ -4,13 +4,14 @@ on:
   push:
     branches:
       - main
+  pull_request:
   workflow_dispatch:
 
 permissions:
   contents: read
 
 concurrency:
-  group: production-frontend
+  group: frontend-${{ github.ref }}
   cancel-in-progress: false
 
 jobs:
@@ -20,7 +21,7 @@ jobs:
     timeout-minutes: 15
 
     env:
-      VITE_API_BASE_URL: https://hiducourse.click/api/v1
+      VITE_API_BASE_URL: /api/v1
 
     steps:
       - name: Checkout source
@@ -47,11 +48,12 @@ jobs:
   deploy:
     name: Deploy to VPS
     needs: ci
+    if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 20
 
     steps:
-      - name: Pull and build frontend
+      - name: Pull, build and restart Frontend container
         env:
           VPS_HOST: ${{ secrets.VPS_HOST }}
           VPS_PORT: ${{ secrets.VPS_PORT }}
@@ -65,26 +67,28 @@ jobs:
           printf '%s\n' "$VPS_KNOWN_HOSTS" > ~/.ssh/known_hosts
           chmod 600 ~/.ssh/known_hosts
 
-          ssh \
-            -i ~/.ssh/deploy_key \
-            -p "$VPS_PORT" \
-            -o BatchMode=yes \
-            -o StrictHostKeyChecking=yes \
-            "$VPS_USER@$VPS_HOST" 'bash -se' <<'REMOTE'
+          ssh -i ~/.ssh/deploy_key -p "$VPS_PORT" -o BatchMode=yes -o StrictHostKeyChecking=yes "$VPS_USER@$VPS_HOST" 'bash -se' <<'REMOTE'
           set -Eeuo pipefail
 
-          export PATH="/usr/local/bin:/usr/bin:/bin:$PATH"
-          APP_DIR="/var/www/english-learning/english-learning-fe"
-
-          cd "$APP_DIR"
+          cd "/var/www/english-learning/english-learning-fe"
           test -f .env
 
           git pull --ff-only origin main
+          docker compose up -d --build --remove-orphans
 
-          npm ci
-          npm run build
+          # Chỉ dọn image cũ của dự án này, không đụng image của pos-saas
+          docker image prune -f --filter label=project=english-learning
 
-          test -f dist/index.html
+          for attempt in $(seq 1 40); do
+            status=$(docker inspect -f '{{.State.Health.Status}}' english-learning-fe 2>/dev/null || true)
+            if [ "$status" = healthy ]; then
+              echo "Frontend deployment succeeded"
+              exit 0
+            fi
+            sleep 3
+          done
 
-          echo "Frontend deployment succeeded"
+          echo "Frontend health check failed (status: $status)"
+          docker compose logs --tail 80 english-learning-fe
+          exit 1
           REMOTE
