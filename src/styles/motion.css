@@ -1,0 +1,221 @@
+/* ==========================================================================
+   Motion system — shared keyframes and utility classes.
+   Every animation here is decorative; prefers-reduced-motion turns them off.
+   ========================================================================== */
+
+@keyframes fade-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes fade-up {
+  from { opacity: 0; transform: translate3d(0, 18px, 0); }
+  to { opacity: 1; transform: none; }
+}
+
+@keyframes fade-down {
+  from { opacity: 0; transform: translate3d(0, -14px, 0); }
+  to { opacity: 1; transform: none; }
+}
+
+@keyframes pop-in {
+  0% { opacity: 0; transform: scale(0.82); }
+  60% { opacity: 1; transform: scale(1.04); }
+  100% { opacity: 1; transform: scale(1); }
+}
+
+@keyframes slide-in-right {
+  from { opacity: 0; transform: translate3d(42px, 0, 0); }
+  to { opacity: 1; transform: none; }
+}
+
+@keyframes slide-in-left {
+  from { opacity: 0; transform: translate3d(-42px, 0, 0); }
+  to { opacity: 1; transform: none; }
+}
+
+@keyframes slide-up-sheet {
+  from { opacity: 0.4; transform: translate3d(0, 100%, 0); }
+  to { opacity: 1; transform: none; }
+}
+
+/* Used by AnswerOption (`animate-[shake_0.5s_ease-in-out]`). */
+@keyframes shake {
+  0%, 100% { transform: translateX(0); }
+  15% { transform: translateX(-9px) rotate(-1deg); }
+  30% { transform: translateX(8px) rotate(1deg); }
+  45% { transform: translateX(-6px); }
+  60% { transform: translateX(5px); }
+  75% { transform: translateX(-3px); }
+}
+
+@keyframes celebrate {
+  0% { transform: scale(1); }
+  35% { transform: scale(1.06) rotate(-1deg); }
+  65% { transform: scale(0.98) rotate(0.6deg); }
+  100% { transform: scale(1); }
+}
+
+@keyframes float {
+  0%, 100% { transform: translate3d(0, 0, 0); }
+  50% { transform: translate3d(0, -12px, 0); }
+}
+
+@keyframes float-tilt {
+  0%, 100% { transform: translate3d(0, 0, 0) rotate(var(--tilt, -4deg)); }
+  50% { transform: translate3d(0, -14px, 0) rotate(calc(var(--tilt, -4deg) * -1)); }
+}
+
+@keyframes wiggle {
+  0%, 100% { transform: rotate(0); }
+  25% { transform: rotate(-9deg) scale(1.08); }
+  50% { transform: rotate(7deg) scale(1.08); }
+  75% { transform: rotate(-4deg) scale(1.04); }
+}
+
+@keyframes pulse-ring {
+  0% { opacity: 0.55; transform: scale(1); }
+  80%, 100% { opacity: 0; transform: scale(1.55); }
+}
+
+@keyframes soft-bounce {
+  0%, 100% { transform: translate(-50%, 0); }
+  50% { transform: translate(-50%, -6px); }
+}
+
+@keyframes shine-sweep {
+  from { transform: translateX(-120%) skewX(-20deg); }
+  to { transform: translateX(260%) skewX(-20deg); }
+}
+
+@keyframes marquee {
+  from { transform: translate3d(0, 0, 0); }
+  to { transform: translate3d(-50%, 0, 0); }
+}
+
+@keyframes blob-drift {
+  0%, 100% { transform: translate3d(0, 0, 0) scale(1); }
+  33% { transform: translate3d(30px, -24px, 0) scale(1.08); }
+  66% { transform: translate3d(-22px, 18px, 0) scale(0.95); }
+}
+
+@keyframes progress-shine {
+  from { background-position: 200% 0; }
+  to { background-position: -200% 0; }
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+/* ---- Utilities ---------------------------------------------------------- */
+
+.anim-fade-in { animation: fade-in var(--dur-slow) var(--ease-out) var(--delay, 0ms) both; }
+.anim-fade-up { animation: fade-up var(--dur-slow) var(--ease-out) var(--delay, 0ms) both; }
+.anim-pop { animation: pop-in var(--dur-slow) var(--ease-spring) var(--delay, 0ms) both; }
+.anim-float { animation: float 5s ease-in-out var(--delay, 0ms) infinite; }
+
+/* Children enter one after another. Works for any list / grid. */
+/* fill-mode "backwards" so hover transforms still work once the entrance ends. */
+.stagger > * {
+  animation: fade-up var(--dur-slow) var(--ease-out) backwards;
+}
+.stagger > :nth-child(1) { animation-delay: 40ms; }
+.stagger > :nth-child(2) { animation-delay: 100ms; }
+.stagger > :nth-child(3) { animation-delay: 160ms; }
+.stagger > :nth-child(4) { animation-delay: 220ms; }
+.stagger > :nth-child(5) { animation-delay: 280ms; }
+.stagger > :nth-child(6) { animation-delay: 340ms; }
+.stagger > :nth-child(n + 7) { animation-delay: 400ms; }
+
+/* Scroll-driven reveal: elements rise in as they enter the viewport.
+   Browsers without scroll timelines simply show the content. */
+@supports (animation-timeline: view()) {
+  .reveal {
+    animation: fade-up linear backwards;
+    animation-timeline: view();
+    animation-range: entry 0% cover 22%;
+  }
+
+  .reveal-pop {
+    animation: pop-in linear backwards;
+    animation-timeline: view();
+    animation-range: entry 0% cover 25%;
+  }
+}
+
+/* Lift on hover for cards. */
+.hover-lift {
+  transition: transform var(--dur-med) var(--ease-out), box-shadow var(--dur-med) var(--ease-out),
+    border-color var(--dur-med) ease;
+}
+
+@media (hover: hover) {
+  .hover-lift:hover {
+    transform: translateY(-4px);
+    box-shadow: var(--shadow-lift);
+  }
+}
+
+/* A light sweep across primary buttons on hover. */
+.btn-shine {
+  position: relative;
+  overflow: hidden;
+  isolation: isolate;
+}
+
+.btn-shine::after {
+  position: absolute;
+  z-index: -1;
+  inset: 0 auto 0 0;
+  width: 40%;
+  background: linear-gradient(90deg, transparent, rgb(255 255 255 / 38%), transparent);
+  content: "";
+  pointer-events: none;
+  transform: translateX(-120%) skewX(-20deg);
+}
+
+@media (hover: hover) {
+  .btn-shine:hover::after {
+    animation: shine-sweep 750ms var(--ease-out);
+  }
+}
+
+/* Route transition stage (LearningLayout). Uses fill-mode "backwards" so no
+   transform lingers after the animation — fixed-position children keep
+   positioning against the viewport. */
+.route-stage {
+  animation: fade-up 420ms var(--ease-out) backwards;
+}
+
+.route-stage[data-direction="forward"] {
+  animation-name: slide-in-right;
+}
+
+.route-stage[data-direction="back"] {
+  animation-name: slide-in-left;
+}
+
+/* ---- Accessibility ------------------------------------------------------ */
+
+@media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
+  }
+
+  /* Spinners keep turning (slowly) so loading states stay legible. */
+  *:not([class*="spinner"]):not(.animate-spin),
+  *::before,
+  *::after {
+    animation-duration: 1ms !important;
+    animation-iteration-count: 1 !important;
+    animation-delay: 0ms !important;
+    transition-duration: 1ms !important;
+    scroll-behavior: auto !important;
+  }
+
+  .reveal,
+  .reveal-pop {
+    animation: none !important;
+  }
+}

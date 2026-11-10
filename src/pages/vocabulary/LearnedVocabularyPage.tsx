@@ -3,6 +3,8 @@ import { userService } from '../../services/user.service'
 import type { SectionVocabularyGroup, SectionVocabularyItem } from '../../types/user.types'
 import { useReviewStats } from '../../hooks/useVocabularyReview'
 import { useNavigate } from 'react-router-dom'
+import SwipeDeck from '../../components/common/SwipeDeck'
+import type { SwipeDeckCard } from '../../components/common/SwipeDeck'
 
 export default function LearnedVocabularyPage({ learnedOnly = false }: { learnedOnly?: boolean }) {
   const navigate = useNavigate()
@@ -12,6 +14,7 @@ export default function LearnedVocabularyPage({ learnedOnly = false }: { learned
   const [statusFilter, setStatusFilter] = useState<'ALL' | 'LEARNED' | 'UNLEARNED'>(learnedOnly ? 'LEARNED' : 'ALL')
   const [playingWord, setPlayingWord] = useState<string | null>(null)
   const [expandedSectionIds, setExpandedSectionIds] = useState<Record<string, boolean>>({})
+  const [viewMode, setViewMode] = useState<'list' | 'cards'>('list')
   const { stats } = useReviewStats()
 
   useEffect(() => {
@@ -83,6 +86,49 @@ export default function LearnedVocabularyPage({ learnedOnly = false }: { learned
       .filter((sec) => sec.topics.length > 0)
   }, [sections, searchQuery, statusFilter])
 
+  // Flatten the filtered words into flashcards for the swipe deck.
+  const flashcards = useMemo<SwipeDeckCard[]>(
+    () =>
+      filteredSections.flatMap((sec) =>
+        sec.topics.flatMap((top) =>
+          top.vocabularies.map((v) => ({
+            id: v.id,
+            front: (
+              <>
+                <span className="flashcard-tag">{top.topicName}</span>
+                <p className="flashcard-word">{v.word}</p>
+                {v.phonetic ? <span className="flashcard-phonetic">{v.phonetic}</span> : null}
+                {v.partOfSpeech ? <span className="flashcard-phonetic">({v.partOfSpeech})</span> : null}
+                <button
+                  type="button"
+                  className="flashcard-speak"
+                  onClick={() => handleSpeak(v.word, v.audioUrl)}
+                >
+                  <svg viewBox="0 0 24 24" aria-hidden="true">
+                    <path d="M5 10v4h3l4 4V6L8 10H5Zm10-2c1.3 1 2 2.3 2 4s-.7 3-2 4" />
+                  </svg>
+                  Nghe phát âm
+                </button>
+              </>
+            ),
+            back: (
+              <>
+                <p className="flashcard-meaning">{v.meaning}</p>
+                {v.example ? (
+                  <p className="flashcard-example">
+                    “{v.example}”
+                    {v.exampleMeaning ? <small>{v.exampleMeaning}</small> : null}
+                  </p>
+                ) : null}
+              </>
+            ),
+          })),
+        ),
+      ),
+    // handleSpeak only reads stable setters and browser APIs.
+    [filteredSections],
+  )
+
   function toggleSection(secId: string) {
     setExpandedSectionIds((prev) => ({
       ...prev,
@@ -115,7 +161,7 @@ export default function LearnedVocabularyPage({ learnedOnly = false }: { learned
   return (
     <main className="w-full max-w-4xl px-4 py-6 md:px-8">
       {/* Header Banner */}
-      <div className="mb-8 rounded-3xl bg-gradient-to-r from-emerald-500 via-teal-500 to-cyan-500 p-6 text-white shadow-lg md:p-8">
+      <div className="vocab-hero anim-fade-up mb-8 rounded-3xl bg-gradient-to-r from-emerald-500 via-teal-500 to-cyan-500 p-6 text-white shadow-lg md:p-8">
         <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
           <div>
             <div className="mb-1 flex items-center gap-2">
@@ -202,6 +248,23 @@ export default function LearnedVocabularyPage({ learnedOnly = false }: { learned
             ⚪ Chưa học ({unlearnedTotal})
           </button>
           </>}
+
+          <div className="vocab-view-toggle" role="group" aria-label="Kiểu hiển thị">
+            <button
+              type="button"
+              aria-pressed={viewMode === 'list'}
+              onClick={() => setViewMode('list')}
+            >
+              📋 Danh sách
+            </button>
+            <button
+              type="button"
+              aria-pressed={viewMode === 'cards'}
+              onClick={() => setViewMode('cards')}
+            >
+              🃏 Thẻ ghi nhớ
+            </button>
+          </div>
         </div>
 
         {/* Search Bar */}
@@ -249,8 +312,23 @@ export default function LearnedVocabularyPage({ learnedOnly = false }: { learned
               : 'Hãy bắt đầu các bài học để cập nhật từ vựng nhé!'}
           </p>
         </div>
+      ) : viewMode === 'cards' ? (
+        <section className="vocab-deck-panel" aria-label="Luyện thẻ ghi nhớ">
+          <header>
+            <h2>Lật thẻ & vuốt để ôn</h2>
+            <p>
+              Chạm vào thẻ để xem nghĩa. Vuốt phải nếu đã nhớ, vuốt trái để ôn lại.
+              {flashcards.length > 0 ? ` (${flashcards.length} thẻ)` : ''}
+            </p>
+          </header>
+          <SwipeDeck
+            key={`${statusFilter}-${searchQuery}-${flashcards.length}`}
+            cards={flashcards}
+            ariaLabel="Thẻ ghi nhớ từ vựng"
+          />
+        </section>
       ) : (
-        <div className="flex flex-col gap-8">
+        <div className="stagger flex flex-col gap-8">
           {filteredSections.map((sec) => {
             const isExpanded = expandedSectionIds[sec.sectionId] ?? true
 
@@ -340,7 +418,7 @@ function VocabularyCard({
 }) {
   return (
     <div
-      className={`group relative flex flex-col justify-between rounded-2xl border-2 p-5 transition-all ${
+      className={`vocab-card group relative flex flex-col justify-between rounded-2xl border-2 p-5 transition-all ${
         item.isLearned
           ? 'border-emerald-200 bg-white shadow-sm hover:border-emerald-400 hover:shadow-md dark:border-emerald-900/60 dark:bg-gray-900'
           : 'border-gray-200 bg-gray-50/70 opacity-75 dark:border-gray-800 dark:bg-gray-900/40'

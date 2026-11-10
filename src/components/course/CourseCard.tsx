@@ -1,3 +1,4 @@
+import type { CSSProperties } from 'react'
 import type { CourseResponse } from '../../types/course.types'
 
 interface CourseCardProps {
@@ -5,60 +6,57 @@ interface CourseCardProps {
   onSelect: (course: CourseResponse) => void
 }
 
+/** Each CEFR level gets its own colour pair and mascot emoji. */
+const levelThemes: Record<string, { from: string; to: string; emoji: string }> = {
+  A1: { from: '#58cc02', to: '#2dbb6e', emoji: '🌱' },
+  A2: { from: '#1cb0f6', to: '#2dbb9a', emoji: '🚀' },
+  B1: { from: '#a855f7', to: '#1cb0f6', emoji: '🧭' },
+  B2: { from: '#ff9600', to: '#ff4b8b', emoji: '🔥' },
+  C1: { from: '#ff4b4b', to: '#a855f7', emoji: '🏆' },
+  C2: { from: '#1f2937', to: '#a855f7', emoji: '👑' },
+}
+
+const fallbackTheme = { from: '#58cc02', to: '#1cb0f6', emoji: '🎓' }
+
 export default function CourseCard({ course, onSelect }: CourseCardProps) {
+  const theme = levelThemes[course.level?.toUpperCase()] ?? fallbackTheme
+
   return (
-    <article className="learning-surface learning-surface--raised group rounded-2xl p-5 border-2 hover:border-emerald-400 hover:shadow-[0_4px_0_#10b981] transition-all flex flex-col justify-between">
-      <div>
-        <div className="flex items-start justify-between gap-3 mb-3">
-          <span className="inline-flex items-center px-2.5 py-1 rounded-xl text-xs font-black bg-emerald-100 text-emerald-800 tracking-wider">
-            {course.level}
-          </span>
-          <span className="learning-subtle-color text-xs font-bold">
-            Khóa #{course.orderIndex}
-          </span>
-        </div>
-
-        <div className="learning-surface--soft w-full h-36 rounded-xl mb-4 overflow-hidden flex items-center justify-center border">
-          {course.thumbnailUrl ? (
-            <img
-              src={course.thumbnailUrl}
-              alt={course.name}
-              className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
-              onError={(e) => {
-                // Fallback to placeholder if broken image
-                (e.target as HTMLElement).style.display = 'none'
-              }}
-            />
-          ) : (
-            <div className="learning-subtle-color text-center p-4">
-              <span className="text-4xl block mb-1">🎓</span>
-              <span className="learning-muted-color text-xs font-bold uppercase tracking-wider">
-                {course.level}
-              </span>
-            </div>
-          )}
-        </div>
-
-        <h3 className="learning-heading-color text-lg font-extrabold group-hover:text-emerald-600 transition-colors mb-1.5 line-clamp-1">
-          {course.name}
-        </h3>
-
-        {course.description ? (
-          <p className="learning-muted-color text-sm leading-relaxed line-clamp-2 mb-4">
-            {course.description}
-          </p>
-        ) : (
-          <p className="learning-subtle-color text-sm italic mb-4">Chưa có mô tả chi tiết.</p>
-        )}
+    <article
+      className="course-card learning-surface hover-lift"
+      style={{ '--course-from': theme.from, '--course-to': theme.to } as CSSProperties}
+    >
+      <div className="course-card__cover">
+        {course.thumbnailUrl ? (
+          <img
+            src={course.thumbnailUrl}
+            alt={course.name}
+            className="course-card__image"
+            onError={(e) => {
+              // Fallback to the gradient cover if the image is broken
+              (e.target as HTMLElement).style.display = 'none'
+            }}
+          />
+        ) : null}
+        <span className="course-card__emoji" aria-hidden="true">{theme.emoji}</span>
+        <span className="course-card__level">{course.level}</span>
+        <span className="course-card__order">Khóa #{course.orderIndex}</span>
       </div>
 
-      <button
-        type="button"
-        onClick={() => onSelect(course)}
-        className="w-full py-2.5 px-4 font-black text-sm text-white bg-emerald-500 hover:bg-emerald-600 rounded-xl shadow-[0_4px_0_#047857] active:translate-y-1 active:shadow-none transition-all cursor-pointer text-center uppercase tracking-wider"
-      >
-        Xem các phần học
-      </button>
+      <div className="course-card__body">
+        <h3 className="course-card__title">{course.name}</h3>
+
+        {course.description ? (
+          <p className="course-card__desc">{course.description}</p>
+        ) : (
+          <p className="course-card__desc course-card__desc--empty">Chưa có mô tả chi tiết.</p>
+        )}
+
+        <button type="button" onClick={() => onSelect(course)} className="course-card__action btn-shine">
+          <span>Xem các phần học</span>
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14m-5-6 6 6-6 6" /></svg>
+        </button>
+      </div>
     </article>
   )
 }

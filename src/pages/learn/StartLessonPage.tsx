@@ -313,7 +313,7 @@ export default function StartLessonPage() {
           />
 
           {question ? (
-            <div className="flex-1">
+            <div key={question.id} className="lesson-question-stage flex-1">
               <QuestionContent question={question} />
 
               {/* Multiple Choice Component */}

@@ -88,7 +88,7 @@ export default function LearnPage() {
         )}
 
         {!isLoading && !error && courses.length > 0 && (
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+          <div className="stagger grid grid-cols-1 md:grid-cols-2 gap-5">
             {courses.map((course) => (
               <CourseCard
                 key={course.id}

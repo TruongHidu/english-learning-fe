@@ -48,7 +48,7 @@ export default function LessonProgressBar({
       {/* Progress track */}
       <div className="flex-1">
         <div
-          className="h-4 w-full overflow-hidden rounded-full bg-slate-200"
+          className="lesson-progress-track h-4 w-full overflow-hidden rounded-full"
           role="progressbar"
           aria-valuemin={0}
           aria-valuemax={total}
@@ -56,7 +56,7 @@ export default function LessonProgressBar({
           aria-label={`Tiến độ: ${current} trên ${total}`}
         >
           <div
-            className="h-full rounded-full bg-emerald-500 transition-all duration-500 ease-out"
+            className="lesson-progress-fill h-full rounded-full transition-all duration-500 ease-out"
             style={{ width: `${percent}%` }}
           />
         </div>
@@ -64,7 +64,8 @@ export default function LessonProgressBar({
 
       {/* Heart indicator (static, non-interactive) */}
       <div
-        className="flex shrink-0 items-center gap-2 font-black text-rose-500"
+        key={hearts}
+        className="lesson-progress-hearts flex shrink-0 items-center gap-2 font-black text-rose-500"
         aria-label={`${hearts} trái tim`}
       >
         <svg width="28" height="28" viewBox="0 0 24 24" fill="#f43f5e" aria-hidden="true">

@@ -1,46 +1,90 @@
 @import "tailwindcss";
+@import "./styles/motion.css";
 
 :root {
   color-scheme: light;
   --page-bg: #ffffff;
-  --page-border: #e5e5e5;
-  --heading-color: #4b4b4b;
-  --muted-color: #777777;
-  --muted-hover-color: #4b4b4b;
-  --secondary-border: #e5e5e5;
-  --secondary-shadow: #d0d0d0;
+  --page-tint: #f6fbf1;
+  --page-border: #e8ecef;
+  --heading-color: #3c4043;
+  --muted-color: #6f7680;
+  --muted-hover-color: #3c4043;
+  --secondary-border: #e5e7eb;
+  --secondary-shadow: #d4d8dd;
   --surface-bg: #ffffff;
-  --surface-soft-bg: #f1f5f9;
-  --surface-border: #e2e8f0;
-  --surface-shadow: #e2e8f0;
+  --surface-soft-bg: #f3f7fa;
+  --surface-border: #e3e9ef;
+  --surface-shadow: #dfe5eb;
   --subtle-color: #94a3b8;
+
+  /* Brand palette */
+  --brand-green: #58cc02;
+  --brand-green-deep: #46a302;
+  --brand-green-dark: #3a8a00;
+  --brand-blue: #1cb0f6;
+  --brand-blue-deep: #1899d6;
+  --brand-orange: #ff9600;
+  --brand-gold: #ffc800;
+  --brand-red: #ff4b4b;
+  --brand-purple: #ce82ff;
+  --brand-gradient: linear-gradient(135deg, #58cc02 0%, #2dbb6e 52%, #1cb0f6 100%);
+
+  /* Elevation & shape */
+  --radius-sm: 12px;
+  --radius-md: 16px;
+  --radius-lg: 22px;
+  --radius-xl: 28px;
+  --shadow-soft: 0 1px 2px rgb(15 23 42 / 4%), 0 8px 24px rgb(15 23 42 / 6%);
+  --shadow-lift: 0 2px 4px rgb(15 23 42 / 5%), 0 18px 40px rgb(15 23 42 / 12%);
+  --glass-bg: rgb(255 255 255 / 72%);
+  --glass-border: rgb(255 255 255 / 60%);
+
+  /* Motion */
+  --ease-out: cubic-bezier(0.22, 1, 0.36, 1);
+  --ease-spring: cubic-bezier(0.34, 1.56, 0.64, 1);
+  --dur-fast: 140ms;
+  --dur-med: 280ms;
+  --dur-slow: 520ms;
+
   color: var(--heading-color);
   background: var(--page-bg);
-  font-family: "Arial Rounded MT Bold", "Nunito", "Segoe UI", sans-serif;
+  font-family: "Nunito", "Arial Rounded MT Bold", "Segoe UI", system-ui, sans-serif;
   font-synthesis: none;
   text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  -webkit-tap-highlight-color: transparent;
 }
 
 @media (prefers-color-scheme: dark) {
   :root {
     color-scheme: dark;
-    --page-bg: #15191a;
-    --page-border: #343a3b;
-    --heading-color: #c6c1ba;
+    --page-bg: #131718;
+    --page-tint: #161c1b;
+    --page-border: #2c3335;
+    --heading-color: #e1ded8;
     --muted-color: #a8a6a2;
-    --muted-hover-color: #d0ceca;
-    --secondary-border: #404546;
-    --secondary-shadow: #2c3031;
-    --surface-bg: #202526;
-    --surface-soft-bg: #282e30;
-    --surface-border: #40494b;
-    --surface-shadow: #0e1112;
+    --muted-hover-color: #e8e5df;
+    --secondary-border: #3a4143;
+    --secondary-shadow: #262b2c;
+    --surface-bg: #1c2122;
+    --surface-soft-bg: #242a2c;
+    --surface-border: #363e40;
+    --surface-shadow: #0c0f10;
     --subtle-color: #858d8f;
+    --shadow-soft: 0 1px 2px rgb(0 0 0 / 30%), 0 8px 24px rgb(0 0 0 / 28%);
+    --shadow-lift: 0 2px 4px rgb(0 0 0 / 30%), 0 18px 40px rgb(0 0 0 / 40%);
+    --glass-bg: rgb(28 33 34 / 72%);
+    --glass-border: rgb(255 255 255 / 7%);
   }
 }
 
 * {
   box-sizing: border-box;
+}
+
+html {
+  scroll-behavior: smooth;
 }
 
 html,
@@ -51,8 +95,27 @@ body,
   margin: 0;
 }
 
+body {
+  overflow-x: hidden;
+}
+
 button {
   font: inherit;
+}
+
+::selection {
+  color: #fff;
+  background: color-mix(in srgb, var(--brand-green) 85%, #000);
+}
+
+:focus-visible {
+  outline-color: #84d8ff;
+}
+
+/* Thin, rounded scrollbars that match the playful UI. */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: color-mix(in srgb, var(--muted-color) 35%, transparent) transparent;
 }
 
 .route-loading,
@@ -62,7 +125,10 @@ button {
   padding: 24px;
   place-items: center;
   color: var(--heading-color);
-  background: var(--page-bg);
+  background:
+    radial-gradient(circle at 20% 15%, rgb(88 204 2 / 10%), transparent 40%),
+    radial-gradient(circle at 85% 80%, rgb(28 176 246 / 10%), transparent 40%),
+    var(--page-bg);
   text-align: center;
 }
 
@@ -81,6 +147,7 @@ button {
 .status-page strong {
   color: #ff4b4b;
   font-size: 64px;
+  animation: pop-in var(--dur-slow) var(--ease-spring) both;
 }
 
 .status-page h1 {
@@ -91,4 +158,36 @@ button {
 .status-page a {
   color: #1cb0f6;
   font-weight: 900;
+}
+
+/* ---- Brand logo (shared by landing, auth and the learning sidebar) ---- */
+
+.brand-logo {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--brand-green);
+  font-size: 32px;
+  font-weight: 900;
+  letter-spacing: -1.5px;
+  line-height: 1;
+}
+
+.brand-logo__icon {
+  width: 1.4em;
+  height: 1.4em;
+  flex: 0 0 auto;
+  transform: rotate(-4deg);
+  transform-origin: 50% 80%;
+  transition: transform var(--dur-med) var(--ease-spring);
+}
+
+.brand-logo__body { fill: currentColor; }
+.brand-logo__eye { fill: #fff; }
+.brand-logo__pupil { fill: #1f2a1a; }
+.brand-logo__beak { fill: var(--brand-gold); }
+
+a:hover > .brand-logo .brand-logo__icon,
+.brand-logo:hover .brand-logo__icon {
+  animation: wiggle 700ms ease-in-out;
 }
